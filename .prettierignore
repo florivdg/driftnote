@@ -1,0 +1,7 @@
+.astro/
+dist/
+data/
+drizzle/
+node_modules/
+bun.lock
+src/lib/db/auth-schema.ts

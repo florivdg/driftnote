@@ -1,0 +1,61 @@
+export type IdeaLike = { id: string; createdAt: number };
+
+export type DayGroup<T extends IdeaLike> = {
+  key: string;
+  label: string;
+  items: T[];
+  ts: number;
+};
+
+function sameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+export function dayLabel(d: Date, now: Date = new Date()): string {
+  const today = now;
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (sameDay(d, today)) return "Today";
+  if (sameDay(d, yesterday)) return "Yesterday";
+  const diff = (today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
+  if (diff < 7) {
+    return d.toLocaleDateString(undefined, { weekday: "long" });
+  }
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+export function formatTime(ts: number, now: number = Date.now()): string {
+  const d = new Date(ts);
+  const mins = Math.round((now - ts) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  return d
+    .toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    .toLowerCase();
+}
+
+export function groupByDay<T extends IdeaLike>(ideas: T[]): DayGroup<T>[] {
+  const buckets = new Map<string, T[]>();
+  for (const i of ideas) {
+    const key = new Date(i.createdAt).toDateString();
+    const arr = buckets.get(key) ?? [];
+    arr.push(i);
+    buckets.set(key, arr);
+  }
+  const groups: DayGroup<T>[] = [];
+  for (const [key, items] of buckets) {
+    items.sort((a, b) => b.createdAt - a.createdAt);
+    groups.push({
+      key,
+      label: dayLabel(new Date(items[0].createdAt)),
+      items,
+      ts: items[0].createdAt,
+    });
+  }
+  groups.sort((a, b) => b.ts - a.ts);
+  return groups;
+}

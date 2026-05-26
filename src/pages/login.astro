@@ -1,0 +1,47 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import LoginForm from "@/components/islands/LoginForm.vue";
+
+export const prerender = false;
+
+if (Astro.locals.user) {
+  return Astro.redirect("/");
+}
+
+const today = new Date().toLocaleDateString(undefined, {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+});
+---
+
+<Layout title="DriftNote · Sign in">
+  <div class="login">
+    <div class="login-left">
+      <div class="login-brand">
+        DriftNote <em>· a quiet place for the half-formed</em>
+      </div>
+      <div class="login-headline">
+        <div class="login-num">
+          <span>{today}</span>
+        </div>
+        <h1>
+          A notebook that doesn't <em>ask anything</em> of you.
+        </h1>
+        <p>
+          Type it, speak it, tag it, leave it. Come back when there's enough to
+          make something out of it.
+        </p>
+      </div>
+      <div class="login-marks">
+        <span>Voice &amp; text</span>
+        <span>Tag-coded</span>
+        <span>No nags</span>
+      </div>
+    </div>
+
+    <div class="login-right">
+      <LoginForm client:load />
+    </div>
+  </div>
+</Layout>

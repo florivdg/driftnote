@@ -1,0 +1,8 @@
+{
+  "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+  "ignoreExportsUsedInFile": true,
+  "ignoreDependencies": ["@astrojs/node", "@astrojs/vue"],
+  "duplicates": {
+    "ignore": ["src/lib/db/auth-schema.ts"]
+  }
+}

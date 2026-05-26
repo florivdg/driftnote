@@ -1,23 +1,43 @@
+---
+import "@/styles/driftnote.css";
+
+interface Props {
+  title?: string;
+  sidebar?: "left" | "right";
+}
+const { title = "DriftNote", sidebar = "left" } = Astro.props;
+---
+
 <!doctype html>
 <html lang="en">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro Basics</title>
-	</head>
-	<body>
-		<slot />
-	</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,400&family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+  </head>
+  <body data-theme="dark" data-density="cozy" data-sidebar={sidebar}>
+    <script is:inline>
+      // FOUC-killer: apply persisted prefs before paint.
+      try {
+        const t = localStorage.getItem("driftnote_theme");
+        if (t === "light" || t === "dark") document.body.dataset.theme = t;
+        const d = localStorage.getItem("driftnote_density");
+        if (d === "compact" || d === "cozy" || d === "airy")
+          document.body.dataset.density = d;
+        const s = localStorage.getItem("driftnote_sidebar");
+        if (s === "left" || s === "right") document.body.dataset.sidebar = s;
+      } catch (e) {
+        /* localStorage unavailable */
+      }
+    </script>
+    <slot />
+  </body>
 </html>
-
-<style>
-	html,
-	body {
-		margin: 0;
-		width: 100%;
-		height: 100%;
-	}
-</style>

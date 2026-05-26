@@ -1,0 +1,94 @@
+---
+import SideTag from "./islands/SideTag.vue";
+import type { TagListEntry } from "@/lib/ideas";
+import { setFlag, toggleTag } from "@/lib/url";
+
+interface Props {
+  url: URL;
+  tagList: TagListEntry[];
+  activeTags: string[];
+  totalIdeas: number;
+  untaggedCount: number;
+  voiceCount: number;
+  untagged: boolean;
+  source: "text" | "voice" | null;
+  query: string;
+}
+const {
+  url,
+  tagList,
+  activeTags,
+  totalIdeas,
+  untaggedCount,
+  voiceCount,
+  untagged,
+  source,
+  query,
+} = Astro.props;
+
+const visible = tagList.filter((t) => t.count > 0);
+const everythingActive =
+  activeTags.length === 0 && !query && !untagged && !source;
+const untaggedActive = untagged;
+const voiceActive = source === "voice";
+---
+
+<aside class="sidebar">
+  <div class="side-section">
+    <div class="side-label"><span>Stream</span></div>
+    <a class={"side-item" + (everythingActive ? " active" : "")} href="/">
+      <span class="dot" style="background: var(--ink)"></span>
+      <span class="label">everything</span>
+      <span class="num">{totalIdeas}</span>
+    </a>
+    <a
+      class={"side-item" + (untaggedActive ? " active" : "")}
+      href={setFlag(
+        new URL(url.pathname, url),
+        "untagged",
+        untagged ? null : "1",
+      )}
+    >
+      <span
+        class="dot"
+        style="background: transparent; border: 1px dashed var(--ink-4)"></span>
+      <span class="label">untagged</span>
+      <span class="num">{untaggedCount}</span>
+    </a>
+    <a
+      class={"side-item" + (voiceActive ? " active" : "")}
+      href={setFlag(
+        new URL(url.pathname, url),
+        "source",
+        voiceActive ? null : "voice",
+      )}
+    >
+      <span
+        class="dot"
+        style="background: transparent; border: 1px dashed var(--ink-4)"></span>
+      <span class="label">voice only</span>
+      <span class="num">{voiceCount}</span>
+    </a>
+  </div>
+
+  <div class="side-divider"></div>
+
+  <div class="side-section">
+    <div class="side-label">
+      <span>Tags</span>
+      <span class="count">{visible.length}</span>
+    </div>
+    {
+      visible.map((tg) => (
+        <SideTag
+          client:idle
+          tag={tg.name}
+          count={tg.count}
+          hue={tg.hue}
+          active={activeTags.includes(tg.name)}
+          href={toggleTag(url, tg.name)}
+        />
+      ))
+    }
+  </div>
+</aside>

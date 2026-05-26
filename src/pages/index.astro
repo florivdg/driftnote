@@ -1,11 +1,149 @@
 ---
-import Welcome from '../components/Welcome.astro';
-import Layout from '../layouts/Layout.astro';
+import Layout from "@/layouts/Layout.astro";
+import Masthead from "@/components/Masthead.astro";
+import Sidebar from "@/components/Sidebar.astro";
+import IdeaCard from "@/components/IdeaCard.astro";
+import DayGroup from "@/components/DayGroup.astro";
+import FilterStrip from "@/components/FilterStrip.astro";
+import Composer from "@/components/islands/Composer.vue";
+import {
+  listIdeas,
+  listTagsWithCounts,
+  countUntagged,
+  countVoice,
+  type StreamFilters,
+} from "@/lib/ideas";
+import { issueNumber } from "@/lib/issueNumber";
+import { parseTags } from "@/lib/url";
+import { groupByDay } from "@/lib/time";
+import { parseSourceParam } from "@/lib/validation";
 
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect(
+    `/login?next=${encodeURIComponent(Astro.url.pathname)}`,
+  );
+}
+
+const q = Astro.url.searchParams.get("q") ?? "";
+const activeTagNames = parseTags(Astro.url.searchParams.get("tags"));
+const untagged = Astro.url.searchParams.get("untagged") === "1";
+const source = parseSourceParam(Astro.url.searchParams.get("source")) ?? null;
+
+const filters: StreamFilters = {
+  q,
+  tags: activeTagNames,
+  untagged,
+  source: source ?? undefined,
+};
+
+const [ideas, tagList, untaggedCount, voiceCount] = await Promise.all([
+  listIdeas(user.id, filters),
+  listTagsWithCounts(user.id),
+  countUntagged(user.id),
+  countVoice(user.id),
+]);
+
+const totalIdeas = tagList.reduce((n, t) => n + t.count, 0);
+
+const groups = groupByDay(ideas);
+
+const visibleTagCount = tagList.filter((t) => t.count > 0).length;
+const activeTagsWithHue = activeTagNames.map((name) => {
+  const found = tagList.find((t) => t.name === name);
+  return { name, hue: found?.hue };
+});
+const suggestedTags = tagList
+  .filter((t) => t.count > 0)
+  .slice(0, 4)
+  .map((t) => t.name);
+
+const MO = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+const now = new Date();
+const weekOf = `${MO[now.getMonth()]} ${now.getDate()}`;
+const issueNo = String(issueNumber()).padStart(3, "0");
 ---
 
-<Layout>
-	<Welcome />
+<Layout title="DriftNote">
+  <div class="app">
+    <Masthead
+      user={user}
+      ideaCount={totalIdeas}
+      tagCount={visibleTagCount}
+      query={q}
+    />
+    <Sidebar
+      url={Astro.url}
+      tagList={tagList}
+      activeTags={activeTagNames}
+      totalIdeas={totalIdeas}
+      untaggedCount={untaggedCount}
+      voiceCount={voiceCount}
+      untagged={untagged}
+      source={source}
+      query={q}
+    />
+    <main class="stream-wrap">
+      <div class="stream-inner">
+        <section class="issue">
+          <div class="issue-line">
+            <span>DriftNote · No. {issueNo}</span>
+            <span class="sep">·</span>
+            <span>Week of {weekOf}</span>
+          </div>
+          <h1 class="issue-title">
+            {totalIdeas} unfinished <em>thoughts</em>, waiting for you.
+          </h1>
+          <p class="issue-sub">
+            Drop what's coming up — half-formed is welcome. Tag it now if you
+            can, or let it sit and tag it later.
+          </p>
+        </section>
+
+        <Composer client:load suggested={suggestedTags} />
+
+        <FilterStrip
+          url={Astro.url}
+          activeTags={activeTagsWithHue}
+          query={q}
+          untagged={untagged}
+          source={source}
+        />
+
+        {
+          ideas.length === 0 ? (
+            <div class="stream-empty">
+              <h3>Nothing here.</h3>
+              <p>Loosen a filter, or jot down what's on your mind.</p>
+            </div>
+          ) : (
+            groups.map((g) => (
+              <DayGroup label={g.label} count={g.items.length}>
+                {g.items.map((idea, idx) => (
+                  <IdeaCard idea={idea} index={idx} url={Astro.url} />
+                ))}
+              </DayGroup>
+            ))
+          )
+        }
+
+        <div class="stream-end">End of stream</div>
+      </div>
+    </main>
+  </div>
 </Layout>

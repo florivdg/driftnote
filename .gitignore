@@ -22,3 +22,7 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# sqlite database (migrations + journal are committed under drizzle/)
+data/
+.fallow/

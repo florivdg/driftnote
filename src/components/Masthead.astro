@@ -1,0 +1,69 @@
+---
+import ThemeToggle from "./islands/ThemeToggle.vue";
+import SearchInput from "./islands/SearchInput.vue";
+
+interface Props {
+  user: { name?: string; email?: string } | null;
+  ideaCount: number;
+  tagCount: number;
+  query: string;
+}
+const { user, ideaCount, tagCount, query } = Astro.props;
+
+const WK = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+const MO = [
+  "JAN",
+  "FEB",
+  "MAR",
+  "APR",
+  "MAY",
+  "JUN",
+  "JUL",
+  "AUG",
+  "SEP",
+  "OCT",
+  "NOV",
+  "DEC",
+];
+const now = new Date();
+const dateStr = `${WK[now.getDay()]} · ${MO[now.getMonth()]} ${now.getDate()}`;
+
+function initials(u: { name?: string; email?: string } | null): string {
+  if (!u) return "?";
+  const n = (u.name ?? "").trim();
+  if (n) {
+    const parts = n.split(/\s+/).slice(0, 2);
+    return parts.map((p) => p[0]!.toUpperCase()).join("");
+  }
+  return (u.email ?? "?")[0]!.toUpperCase();
+}
+const avatar = initials(user);
+---
+
+<header class="masthead">
+  <div class="masthead-brand">DriftNote</div>
+  <span class="masthead-meta">
+    <span>{dateStr}</span>
+    <span class="sep">·</span>
+    <span>{ideaCount} ENTRIES</span>
+    <span class="sep">·</span>
+    <span>{tagCount} TAGS</span>
+  </span>
+  <span class="masthead-spacer"></span>
+
+  <form class="masthead-search" method="get" action="/" role="search">
+    <span>Search</span>
+    <SearchInput client:load initial={query} />
+    <span class="kbd">/</span>
+  </form>
+
+  <ThemeToggle client:load />
+
+  {
+    user ? (
+      <div class="avatar" title={user.name ?? user.email ?? ""}>
+        {avatar}
+      </div>
+    ) : null
+  }
+</header>

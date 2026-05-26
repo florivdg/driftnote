@@ -1,46 +1,43 @@
-# Astro Starter Kit: Basics
+# DriftNote
+
+A notebook that doesn't ask anything of you — a reverse-chronological stream of ideas, tagged by hashtag, captured by text or voice. Astro 6 SSR + Vue islands + Drizzle on bun:sqlite + Better Auth (passkey-only).
+
+Planning docs live under [`docs/`](./docs/).
+
+## Local setup
+
+Requires **Bun** (the runtime, not just the package manager) — `bun:sqlite` is a Bun built-in.
 
 ```sh
-bun create astro@latest -- --template basics
+bun install
+cp .env.example .env
+echo "BETTER_AUTH_SECRET=$(openssl rand -base64 32)" >> .env  # if .env wasn't seeded
+bun x auth@latest generate --output src/lib/db/auth-schema.ts --yes
+bun run db:generate
+bun run db:migrate
+bun run dev
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+Then visit `http://localhost:4321` — you'll be redirected to `/login`. Register a passkey (Touch ID on macOS Safari is the smoothest path) and you'll land on the stream.
 
-## 🚀 Project Structure
+## Scripts
 
-Inside of your Astro project, you'll see the following folders and files:
+| Command               | Action                                            |
+| --------------------- | ------------------------------------------------- |
+| `bun run dev`         | Start the dev server under the Bun runtime        |
+| `bun run build`       | Build the SSR bundle to `./dist/`                 |
+| `bun run preview`     | Preview the production build                      |
+| `bun run start`       | Run the standalone Node SSR entry from `./dist/`  |
+| `bun run check`       | Type-check with `astro check`                     |
+| `bun run db:generate` | Emit a new Drizzle migration to `./drizzle/`      |
+| `bun run db:migrate`  | Apply pending migrations to `./data/driftnote.db` |
+| `bun run db:studio`   | Open Drizzle Studio                               |
 
-```text
-/
-├── public/
-│   └── favicon.svg
-├── src
-│   ├── assets
-│   │   └── astro.svg
-│   ├── components
-│   │   └── Welcome.astro
-│   ├── layouts
-│   │   └── Layout.astro
-│   └── pages
-│       └── index.astro
-└── package.json
-```
+## Architecture (one-liners)
 
-To learn more about the folder structure of an Astro project, refer to [our guide on project structure](https://docs.astro.build/en/basics/project-structure/).
+- **Astro 6 SSR** with the node standalone adapter; islands hydrated via `@astrojs/vue`.
+- **bun:sqlite** + Drizzle — single connection (`src/lib/db/client.ts`); WAL + foreign keys on at boot.
+- **Better Auth** with the passkey plugin only; wired via the Drizzle adapter so auth tables share one migration history with app tables.
+- **Tag colors** are OKLCH — each tag carries a hue 0–360; cards, chips, sidebar dots, stamps all derive their final color via theme-scoped L/C tokens.
 
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `bun install`             | Installs dependencies                            |
-| `bun dev`             | Starts local dev server at `localhost:4321`      |
-| `bun build`           | Build your production site to `./dist/`          |
-| `bun preview`         | Preview your build locally, before deploying     |
-| `bun astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `bun astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+See [`docs/DESIGN.md`](./docs/DESIGN.md), [`docs/DATA_MODEL.md`](./docs/DATA_MODEL.md), and [`docs/AUTH.md`](./docs/AUTH.md) for the contract.

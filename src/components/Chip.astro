@@ -1,0 +1,26 @@
+---
+interface Props {
+  tag: string;
+  hue?: number | null;
+  dashed?: boolean;
+  removeHref?: string;
+}
+const { tag, hue, dashed = false, removeHref } = Astro.props;
+const hasHue = typeof hue === "number";
+const cls = ["chip", dashed ? "btn-chip" : "", hasHue ? "has-hue" : ""]
+  .filter(Boolean)
+  .join(" ");
+const style = hasHue ? `--hue: ${hue}` : "";
+---
+
+<span class={cls} style={style}>
+  <span class="chip-mark"></span>
+  <span>{tag}</span>
+  {
+    removeHref && (
+      <a class="x" href={removeHref} aria-label={`remove ${tag}`}>
+        ×
+      </a>
+    )
+  }
+</span>
