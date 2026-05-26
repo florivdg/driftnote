@@ -62,6 +62,7 @@ onBeforeUnmount(() => {
     name="q"
     placeholder="…"
     autocomplete="off"
+    aria-label="Search notes"
     @input="onInput"
     @keydown="onKeyDown"
   />

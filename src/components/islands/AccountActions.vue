@@ -66,7 +66,7 @@ async function handleSignOut() {
       </span>
       <span class="account-meta">sign out</span>
     </button>
-    <p v-if="message" class="account-msg">{{ message }}</p>
-    <p v-if="error" class="account-error">{{ error }}</p>
+    <p v-if="message" class="account-msg" role="status">{{ message }}</p>
+    <p v-if="error" class="account-error" role="alert">{{ error }}</p>
   </div>
 </template>

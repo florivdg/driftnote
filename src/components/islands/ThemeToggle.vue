@@ -21,6 +21,8 @@ function toggle() {
     class="theme-toggle"
     @click="toggle"
     :title="`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`"
+    :aria-label="`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`"
+    :aria-pressed="theme === 'dark'"
     type="button"
   >
     <span class="knob">

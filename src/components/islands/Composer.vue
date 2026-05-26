@@ -7,6 +7,7 @@ import {
   useTemplateRef,
   watch,
 } from "vue";
+import { navigate } from "astro:transitions/client";
 import { extractTags } from "@/lib/tags";
 import { isPlainHotkey } from "@/lib/dom";
 
@@ -23,6 +24,7 @@ const transcript = ref("");
 const elapsed = ref(0);
 const submitting = ref(false);
 const sourceForNextSubmit = ref<"text" | "voice">("text");
+const statusMsg = ref("");
 const ta = useTemplateRef<HTMLTextAreaElement>("ta");
 
 let recTimer: ReturnType<typeof setInterval> | null = null;
@@ -46,6 +48,7 @@ watch(recording, (rec) => {
   if (rec) {
     transcript.value = "";
     elapsed.value = 0;
+    statusMsg.value = "Listening for voice input.";
     recTimer = setInterval(() => (elapsed.value += 1), 1000);
     let i = 0;
     transTimer = setInterval(() => {
@@ -54,8 +57,11 @@ watch(recording, (rec) => {
       if (i >= VOICE_SAMPLE.length && transTimer) {
         clearInterval(transTimer);
         transTimer = null;
+        statusMsg.value = "Voice transcript ready.";
       }
     }, 55);
+  } else {
+    statusMsg.value = "";
   }
 });
 
@@ -101,7 +107,9 @@ async function submit() {
     await postIdea(body, sourceForNextSubmit.value);
     text.value = "";
     sourceForNextSubmit.value = "text";
-    location.reload();
+    await navigate(location.pathname + location.search, {
+      history: "replace",
+    });
   } catch (err) {
     console.error(err);
     submitting.value = false;
@@ -139,12 +147,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="composer">
+    <span class="visually-hidden" aria-live="polite">{{ statusMsg }}</span>
     <div class="composer-body">
       <textarea
         ref="ta"
         v-model="text"
         :rows="2"
         placeholder="What's coming up?"
+        aria-label="New idea"
         @keydown="onKeyDown"
       ></textarea>
     </div>
@@ -198,7 +208,7 @@ onBeforeUnmount(() => {
         style="
           font-family: var(--font-mono);
           font-size: 10px;
-          color: var(--ink-4);
+          color: var(--ink-3);
           text-transform: uppercase;
           letter-spacing: 0.08em;
           align-self: center;
@@ -206,16 +216,16 @@ onBeforeUnmount(() => {
       >
         Add →
       </span>
-      <span
+      <button
         v-for="t in suggested.slice(0, 4)"
         :key="t"
+        type="button"
         class="chip btn-chip"
-        role="button"
         @click="addSuggestion(t)"
       >
         <span class="chip-mark"></span>
         <span>{{ t }}</span>
-      </span>
+      </button>
     </div>
 
     <div class="composer-bar">

@@ -40,8 +40,9 @@ const today = new Date().toLocaleDateString(undefined, {
       </div>
     </div>
 
-    <div class="login-right">
+    <main id="main" class="login-right" tabindex="-1">
+      <h1 class="visually-hidden">Sign in to DriftNote</h1>
       <LoginForm client:load />
-    </div>
+    </main>
   </div>
 </Layout>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, useTemplateRef } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef } from "vue";
 import { signOutAndRedirect } from "@/lib/account-actions";
 import { MONTHS_SHORT, WEEKDAYS_SHORT } from "@/lib/time";
 
@@ -32,6 +32,9 @@ function openMenu() {
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
   }, 0);
+  void nextTick().then(() => {
+    menuRef.value?.querySelector<HTMLElement>("a, button")?.focus();
+  });
 }
 
 function closeMenu() {
@@ -52,7 +55,10 @@ function onDoc(e: MouseEvent) {
 }
 
 function onKey(e: KeyboardEvent) {
-  if (e.key === "Escape") closeMenu();
+  if (e.key === "Escape") {
+    closeMenu();
+    triggerRef.value?.focus();
+  }
 }
 
 async function handleSignOut() {
@@ -92,7 +98,6 @@ onBeforeUnmount(() => {
       ref="menuRef"
       class="user-menu"
       :style="{ top: menuPos.top + 'px', right: menuPos.right + 'px' }"
-      role="menu"
       aria-label="Account menu"
     >
       <div class="user-menu-line">
@@ -105,14 +110,13 @@ onBeforeUnmount(() => {
         <span v-if="email && name" class="user-menu-email">{{ email }}</span>
       </div>
       <div class="user-menu-rule" />
-      <a class="user-menu-item" role="menuitem" href="/account">
+      <a class="user-menu-item" href="/account">
         <span class="user-menu-mark" />
         <span class="user-menu-label">account</span>
       </a>
       <button
         type="button"
         class="user-menu-item user-menu-item-out"
-        role="menuitem"
         :disabled="signingOut"
         @click="handleSignOut"
       >
@@ -121,7 +125,7 @@ onBeforeUnmount(() => {
           signingOut ? "signing out…" : "sign out"
         }}</span>
       </button>
-      <p v-if="error" class="user-menu-error">{{ error }}</p>
+      <p v-if="error" class="user-menu-error" role="alert">{{ error }}</p>
     </div>
   </div>
 </template>

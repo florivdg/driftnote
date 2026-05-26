@@ -105,8 +105,9 @@ async function trigger() {
 
     <template v-if="mode === 'signup'">
       <div class="login-field">
-        <label>Name</label>
+        <label for="login-name">Name</label>
         <input
+          id="login-name"
           v-model="name"
           type="text"
           placeholder="Aria K."
@@ -114,8 +115,9 @@ async function trigger() {
         />
       </div>
       <div class="login-field">
-        <label>Email</label>
+        <label for="login-email">Email</label>
         <input
+          id="login-email"
           v-model="email"
           type="email"
           placeholder="you@somewhere.com"
@@ -128,6 +130,7 @@ async function trigger() {
       type="button"
       :class="['btn', 'btn-passkey', authing && 'authing']"
       :disabled="buttonDisabled"
+      :aria-busy="authing"
       @click="trigger"
     >
       <template v-if="authing">
@@ -158,7 +161,12 @@ async function trigger() {
       </template>
     </button>
 
-    <p v-if="error" class="sub" style="color: var(--hot); margin-top: 8px">
+    <p
+      v-if="error"
+      class="sub"
+      style="color: var(--hot); margin-top: 8px"
+      role="alert"
+    >
       {{ error }}
     </p>
   </form>

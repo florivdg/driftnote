@@ -32,7 +32,7 @@ const firstName = (user.name ?? user.email ?? "you").split(/\s+/)[0];
       tagCount={visibleTagCount}
       query=""
     />
-    <main class="account-stream">
+    <main id="main" class="account-stream" tabindex="-1">
       <div class="stream-inner">
         <section class="issue">
           <div class="issue-line">

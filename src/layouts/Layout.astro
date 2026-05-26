@@ -25,6 +25,7 @@ const { title = "DriftNote", sidebar = "left" } = Astro.props;
     <ClientRouter />
   </head>
   <body data-theme="dark" data-density="cozy" data-sidebar={sidebar}>
+    <a href="#main" class="skip-link">Skip to content</a>
     {
       /* If this script body changes, rerun `bun scripts/csp-fouc-hash.ts` and
         update `security.csp.scriptDirective.hashes` in astro.config.mjs.
