@@ -1,5 +1,6 @@
 ---
 import "@/styles/driftnote.css";
+import { ClientRouter } from "astro:transitions";
 
 interface Props {
   title?: string;
@@ -9,7 +10,7 @@ const { title = "DriftNote", sidebar = "left" } = Astro.props;
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" transition:animate="none">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -21,13 +22,16 @@ const { title = "DriftNote", sidebar = "left" } = Astro.props;
       rel="stylesheet"
     />
     <title>{title}</title>
+    <ClientRouter />
   </head>
   <body data-theme="dark" data-density="cozy" data-sidebar={sidebar}>
     {
       /* If this script body changes, rerun `bun scripts/csp-fouc-hash.ts` and
-        update `security.csp.scriptDirective.hashes` in astro.config.mjs. */
+        update `security.csp.scriptDirective.hashes` in astro.config.mjs.
+        `data-astro-rerun` makes it re-execute after every view transition swap
+        so the persisted theme/density/sidebar attributes are re-applied. */
     }
-    <script is:inline>
+    <script is:inline data-astro-rerun>
       // FOUC-killer: apply persisted prefs before paint.
       try {
         const t = localStorage.getItem("driftnote_theme");

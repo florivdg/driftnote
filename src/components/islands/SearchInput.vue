@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
+import { navigate } from "astro:transitions/client";
 import { isPlainHotkey } from "@/lib/dom";
+import { setQuery } from "@/lib/url";
 
 // Debounced search island. Owns the masthead search input.
 //
-// V1 strategy: on input change, debounce 250ms, then navigate to the new URL
-// (history.pushState + location.replace). The SSR page re-renders the stream.
-// V2 (deferred): fetch /api/ideas and patch the stream container in place —
-// requires duplicating IdeaCard markup in Vue, not worth it for v1.
+// On input change, debounce 250ms, then hand off to Astro's view-transition
+// router via navigate(). The island is mounted with `transition:persist` in
+// Masthead.astro, so the DOM element and this Vue instance survive the swap —
+// focus and caret stay where the user left them while typing.
 
 const props = defineProps<{
   initial: string;
@@ -17,12 +19,9 @@ const value = ref(props.initial);
 let timer: ReturnType<typeof setTimeout> | null = null;
 
 function commit() {
-  const url = new URL(location.href);
-  const trimmed = value.value.trim();
-  if (trimmed) url.searchParams.set("q", trimmed);
-  else url.searchParams.delete("q");
-  if (url.toString() === location.href) return;
-  location.assign(url.toString());
+  const next = setQuery(new URL(location.href), value.value.trim());
+  if (next === `${location.pathname}${location.search}`) return;
+  navigate(next, { history: "push" });
 }
 
 function onInput() {

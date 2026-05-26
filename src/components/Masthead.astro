@@ -40,7 +40,7 @@ const avatar = initials(user);
 
   <form class="masthead-search" method="get" action="/" role="search">
     <span>Search</span>
-    <SearchInput client:load initial={query} />
+    <SearchInput client:load transition:persist initial={query} />
     <span class="kbd">/</span>
   </form>
 

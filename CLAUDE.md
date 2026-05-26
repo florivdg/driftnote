@@ -39,7 +39,13 @@ Run them in this order: format first (changes the bytes lint and check see), the
 
 The planning docs at `docs/{README,DESIGN,DATA_MODEL,AUTH}.md` are the contract. Read them before non-trivial work — they explain _why_ decisions were made.
 
-**SSR is the authority.** The home page (`src/pages/index.astro`) reads `?q`, `?tags`, `?untagged`, `?source` from the URL and runs the stream + tag-list queries server-side. Vue islands (5 of them — `Composer`, `SideTag`/`ColorPicker`, `ThemeToggle`, `SearchInput`, `LoginForm`) handle interactivity only; they never own the stream's render. `SearchInput` debounces input and navigates (`location.assign`) — there is no client-side stream patching, by design.
+**SSR is the authority.** The home page (`src/pages/index.astro`) reads `?q`, `?tags`, `?untagged`, `?source` from the URL and runs the stream + tag-list queries server-side. Vue islands (5 of them — `Composer`, `SideTag`/`ColorPicker`, `ThemeToggle`, `SearchInput`, `LoginForm`) handle interactivity only; they never own the stream's render. `SearchInput` debounces input and hands off to Astro's view-transition router — there is no client-side stream patching, by design.
+
+**Navigation uses Astro's `<ClientRouter />` (view transitions).** Rendered once in `Layout.astro`'s `<head>`. Every link, form, and programmatic `navigate(...)` triggers an SSR fetch + DOM swap rather than a full page reload. Three consequences worth knowing before editing:
+
+1. `SearchInput` is mounted with `transition:persist` in `Masthead.astro` so the input's DOM node and Vue state survive the swap — focus and caret stay where the user left them between keystrokes. Other islands re-hydrate on each swap.
+2. Programmatic navigation from islands must call `navigate()` from `astro:transitions/client`, not `location.assign` / `location.href`. The router does not intercept raw `location.*` writes — using them causes a full reload and defeats `transition:persist`.
+3. Inline `<script is:inline>` blocks do **not** re-run after a swap by default. Anything that must run on every page (the `Layout.astro` FOUC-killer is the current example) needs `data-astro-rerun`. Changing the script body still requires re-hashing for CSP via `bun scripts/csp-fouc-hash.ts`; the attribute does not affect the hash.
 
 **One Drizzle client, one SQLite connection.** `src/lib/db/client.ts` constructs a single `bun:sqlite` `Database`, runs `PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON`, and exports `db`. App tables (`ideas`, `tags`, `idea_tags`) live in `src/lib/db/schema.ts`; Better Auth tables (`user`, `session`, `account`, `verification`, `passkey`) are re-exported from `auth-schema.ts`. `drizzle-kit` sees both, so there is one unified migration history under `./drizzle/`.
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import { navigate } from "astro:transitions/client";
 import { authClient, unwrapAuthResult } from "@/lib/auth-client";
 
 const mode = ref<"signin" | "signup">("signin");
@@ -16,7 +17,7 @@ const buttonDisabled = computed(() => {
 
 function redirect() {
   const next = new URL(location.href).searchParams.get("next") ?? "/";
-  location.href = next;
+  navigate(next, { history: "push" });
 }
 
 async function performSignIn() {
