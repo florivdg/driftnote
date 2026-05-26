@@ -1,6 +1,8 @@
 ---
 import ThemeToggle from "./islands/ThemeToggle.vue";
 import SearchInput from "./islands/SearchInput.vue";
+import UserMenu from "./islands/UserMenu.vue";
+import { MONTHS_SHORT, WEEKDAYS_SHORT } from "@/lib/time";
 
 interface Props {
   user: { name?: string; email?: string } | null;
@@ -10,23 +12,8 @@ interface Props {
 }
 const { user, ideaCount, tagCount, query } = Astro.props;
 
-const WK = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-const MO = [
-  "JAN",
-  "FEB",
-  "MAR",
-  "APR",
-  "MAY",
-  "JUN",
-  "JUL",
-  "AUG",
-  "SEP",
-  "OCT",
-  "NOV",
-  "DEC",
-];
 const now = new Date();
-const dateStr = `${WK[now.getDay()]} · ${MO[now.getMonth()]} ${now.getDate()}`;
+const dateStr = `${WEEKDAYS_SHORT[now.getDay()]} · ${MONTHS_SHORT[now.getMonth()]} ${now.getDate()}`;
 
 function initials(u: { name?: string; email?: string } | null): string {
   if (!u) return "?";
@@ -61,9 +48,12 @@ const avatar = initials(user);
 
   {
     user ? (
-      <div class="avatar" title={user.name ?? user.email ?? ""}>
-        {avatar}
-      </div>
+      <UserMenu
+        client:load
+        name={user.name}
+        email={user.email}
+        initials={avatar}
+      />
     ) : null
   }
 </header>

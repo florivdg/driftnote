@@ -1,0 +1,94 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Masthead from "@/components/Masthead.astro";
+import AccountActions from "@/components/islands/AccountActions.vue";
+import { listTagsWithCounts } from "@/lib/ideas";
+import { issueNumber } from "@/lib/issueNumber";
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect("/login?next=/account");
+}
+
+const tagList = await listTagsWithCounts(user.id);
+let totalIdeas = 0;
+let visibleTagCount = 0;
+for (const t of tagList) {
+  totalIdeas += t.count;
+  if (t.count > 0) visibleTagCount += 1;
+}
+
+const issueNo = String(issueNumber()).padStart(3, "0");
+const firstName = (user.name ?? user.email ?? "you").split(/\s+/)[0];
+---
+
+<Layout title="DriftNote · Account">
+  <div class="account-shell">
+    <Masthead
+      user={user}
+      ideaCount={totalIdeas}
+      tagCount={visibleTagCount}
+      query=""
+    />
+    <main class="account-stream">
+      <div class="stream-inner">
+        <section class="issue">
+          <div class="issue-line">
+            <span>DriftNote · Profile</span>
+            <span class="sep">·</span>
+            <span>No. {issueNo}</span>
+            <span class="sep">·</span>
+            <span>Signed in</span>
+          </div>
+          <h1 class="issue-title">
+            On the masthead, <em>{firstName}</em>.
+          </h1>
+          <p class="issue-sub">
+            Your stream's bylines. Add another device, or step out for now.
+          </p>
+        </section>
+
+        <section class="account-section">
+          <div class="account-section-label">
+            <span>Bylines</span>
+            <span class="account-section-count">02</span>
+          </div>
+          <article class="account-entry">
+            <div class="account-entry-top">
+              <span class="account-entry-num">№01</span>
+              <span class="account-entry-stamp">name</span>
+            </div>
+            <div class="account-entry-body">{user.name ?? "—"}</div>
+          </article>
+          <article class="account-entry">
+            <div class="account-entry-top">
+              <span class="account-entry-num">№02</span>
+              <span class="account-entry-stamp">correspondence</span>
+            </div>
+            <div class="account-entry-body account-entry-mono">
+              {user.email ?? "—"}
+            </div>
+          </article>
+        </section>
+
+        <section class="account-section">
+          <div class="account-section-label">
+            <span>Devices</span>
+            <span class="account-section-count">·</span>
+          </div>
+          <AccountActions client:load />
+        </section>
+
+        <div class="stream-end">
+          <span>End of profile</span>
+        </div>
+
+        <p class="account-back">
+          <a href="/">← back to stream</a>
+        </p>
+      </div>
+    </main>
+  </div>
+</Layout>
