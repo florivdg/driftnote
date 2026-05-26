@@ -30,7 +30,7 @@ Edits aren't complete until all four pass on the working tree:
 
 1. `bun run format` — Prettier writes the canonical layout.
 2. `bun run lint` — type-aware oxlint, must exit 0.
-3. `bun run check` — `astro check`, 0 errors and 0 warnings.
+3. `bun run check` — `astro check`, 0 errors, 0 warnings, **and 0 hints** (hints often surface deprecation warnings like `ts(6387)` that block clean builds later).
 4. `bun run fallow` — dead code, duplication, complexity all clean.
 
 Run them in this order: format first (changes the bytes lint and check see), then lint (fast feedback on obvious bugs), then check (catches type regressions across `.astro`/`.ts`/`.vue`), then fallow (surfaces health issues the other three miss). Fix and rerun until each is clean before declaring the task done.
