@@ -49,6 +49,18 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "authentication failed";
 }
 
+function handleAuthError(err: unknown) {
+  console.error(err);
+  const msg = errorMessage(err);
+  // Server refuses passkey signup when the email already has an account.
+  // Flip to sign-in so the user's existing passkey unlocks the account.
+  if (mode.value === "signup" && msg.includes("already exists")) {
+    mode.value = "signin";
+  }
+  error.value = msg;
+  authing.value = false;
+}
+
 async function trigger() {
   if (buttonDisabled.value) return;
   authing.value = true;
@@ -57,9 +69,7 @@ async function trigger() {
     await ACTIONS[mode.value]();
     redirect();
   } catch (err) {
-    console.error(err);
-    error.value = errorMessage(err);
-    authing.value = false;
+    handleAuthError(err);
   }
 }
 </script>

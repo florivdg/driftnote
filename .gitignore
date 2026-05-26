@@ -26,3 +26,6 @@ pnpm-debug.log*
 # sqlite database (migrations + journal are committed under drizzle/)
 data/
 .fallow/
+
+# playwright-cli session artifacts
+.playwright-cli/

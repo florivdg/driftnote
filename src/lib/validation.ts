@@ -2,7 +2,16 @@ import { isValidHue } from "@/lib/tags";
 
 export type ParsedOr<T> = { ok: true; value: T } | { ok: false; res: Response };
 
+const MAX_BODY_BYTES = 32_000;
+
 async function readJson(req: Request): Promise<ParsedOr<unknown>> {
+  const len = Number(req.headers.get("content-length"));
+  if (Number.isFinite(len) && len > MAX_BODY_BYTES) {
+    return {
+      ok: false,
+      res: new Response("Payload too large", { status: 413 }),
+    };
+  }
   try {
     return { ok: true, value: await req.json() };
   } catch {

@@ -16,6 +16,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "fallow": "fallow",
+    "csp:hash": "bun scripts/csp-fouc-hash.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun scripts/migrate.ts",
     "db:studio": "drizzle-kit studio",

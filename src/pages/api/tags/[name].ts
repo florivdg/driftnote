@@ -3,6 +3,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { tags } from "@/lib/db/schema";
 import { parseHueBody } from "@/lib/validation";
+import { checkRate, rateLimitedResponse, writeBucket } from "@/lib/ratelimit";
+import { audit } from "@/lib/audit";
 
 export const prerender = false;
 
@@ -27,14 +29,28 @@ async function updateTagHue(userId: string, name: string, hue: number) {
   return result[0] ?? null;
 }
 
+function gateWrite(userId: string): Response | null {
+  const gate = checkRate(writeBucket, userId);
+  if (gate.ok) return null;
+  audit("rate_limited", { userId, route: "PATCH /api/tags/[name]" });
+  return rateLimitedResponse(gate.retryAfter);
+}
+
+async function applyHueUpdate(ctx: Ctx, request: Request): Promise<Response> {
+  const parsed = await parseHueBody(request);
+  if (!parsed.ok) return parsed.res;
+  const tag = await updateTagHue(ctx.userId, ctx.tagName, parsed.value);
+  if (!tag) return new Response("Tag not found", { status: 404 });
+  audit("tag_update", {
+    userId: ctx.userId,
+    name: ctx.tagName,
+    hue: parsed.value,
+  });
+  return Response.json({ tag });
+}
+
 export const PATCH: APIRoute = async ({ params, request, locals }) => {
   const ctx = requireTagContext(locals, params);
   if (ctx instanceof Response) return ctx;
-
-  const parsed = await parseHueBody(request);
-  if (!parsed.ok) return parsed.res;
-
-  const tag = await updateTagHue(ctx.userId, ctx.tagName, parsed.value);
-  if (!tag) return new Response("Tag not found", { status: 404 });
-  return Response.json({ tag });
+  return gateWrite(ctx.userId) ?? applyHueUpdate(ctx, request);
 };
