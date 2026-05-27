@@ -56,7 +56,8 @@ function unauthResponse(ctx: APIContext, path: string): Response {
   if (path.startsWith("/api/")) {
     return new Response("Unauthorized", { status: 401 });
   }
-  return ctx.redirect(`/login?next=${encodeURIComponent(path)}`);
+  const next = path + ctx.url.search;
+  return ctx.redirect(`/login?next=${encodeURIComponent(next)}`);
 }
 
 function resolveAuthResponse(

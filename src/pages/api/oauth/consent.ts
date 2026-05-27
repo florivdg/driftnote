@@ -1,4 +1,5 @@
 import type { APIRoute } from "astro";
+import { isAPIError } from "better-auth/api";
 import { auth } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 
@@ -7,6 +8,25 @@ export const prerender = false;
 function readConsentCode(form: FormData): string | null {
   const value = form.get("consent_code");
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+async function submitConsent(
+  request: Request,
+  consentCode: string,
+  accept: boolean,
+): Promise<Response> {
+  try {
+    const { redirectURI } = await auth.api.oAuthConsent({
+      body: { accept, consent_code: consentCode },
+      headers: request.headers,
+    });
+    return Response.json({ redirectURI });
+  } catch (err) {
+    if (isAPIError(err)) {
+      return Response.json({ error: err.message }, { status: err.statusCode });
+    }
+    throw err;
+  }
 }
 
 // Returns JSON, not a 302. The consent page submits via fetch and navigates
@@ -26,11 +46,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
     return Response.json({ error: "missing consent_code" }, { status: 400 });
   }
 
-  const { redirectURI } = await auth.api.oAuthConsent({
-    body: { accept, consent_code: consentCode },
-    headers: request.headers,
-  });
-
-  audit("mcp_consent", { userId: locals.user.id, accepted: accept });
-  return Response.json({ redirectURI });
+  const response = await submitConsent(request, consentCode, accept);
+  if (response.ok) {
+    audit("mcp_consent", { userId: locals.user.id, accepted: accept });
+  }
+  return response;
 };
