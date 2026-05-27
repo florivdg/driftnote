@@ -1,8 +1,11 @@
 import { createAuthClient } from "better-auth/client";
 import { passkeyClient } from "@better-auth/passkey/client";
 
+// authClient is only invoked client-side; the SSR fallback exists purely so the
+// module can be imported during island SSR (createAuthClient parses baseURL).
 export const authClient = createAuthClient({
-  baseURL: window.location.origin,
+  baseURL:
+    typeof window === "undefined" ? "http://localhost" : window.location.origin,
   plugins: [passkeyClient()],
 });
 

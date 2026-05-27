@@ -8,7 +8,6 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
-import { nanoid } from "nanoid";
 import { db } from "@/lib/db/client";
 import { ideas, tags, ideaTags } from "@/lib/db/schema";
 import { defaultHueFor, extractTags } from "@/lib/tags";
@@ -44,7 +43,7 @@ export async function createIdeaWithTags(opts: {
   const text = opts.body.trim();
   const extracted = extractTags(text);
   const now = Date.now();
-  const ideaId = nanoid();
+  const ideaId = Bun.randomUUIDv7();
 
   const inserted: IdeaWithTags = await db.transaction(async (tx) => {
     await tx.insert(ideas).values({
@@ -77,7 +76,7 @@ export async function createIdeaWithTags(opts: {
         tagId = existing.id;
         hue = existing.hue;
       } else {
-        tagId = nanoid();
+        tagId = Bun.randomUUIDv7();
         hue = defaultHueFor(name);
         await tx.insert(tags).values({
           id: tagId,

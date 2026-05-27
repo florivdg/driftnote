@@ -22,7 +22,7 @@ Bun is required, not just as a package manager — `src/lib/db/client.ts` import
 | `bun run db:migrate`                                                       | Apply pending migrations to `./data/driftnote.db`                                                      |
 | `bunx --bun auth@latest generate --output src/lib/db/auth-schema.ts --yes` | Regenerate the Better Auth schema (run **before** `db:generate` so the migration includes auth tables) |
 
-No automated tests exist. The v1 acceptance contract is the manual checklist in `docs/` and the smoke flow: `/` → 302 to `/login`, register a passkey, `POST /api/ideas` with `#tag` persists, sidebar updates with the right hue.
+No automated tests exist. The v1 acceptance contract is the smoke flow: `/` → 302 to `/login`, register a passkey, `POST /api/ideas` with `#tag` persists, sidebar updates with the right hue.
 
 ## After every edit, run these — in order
 
@@ -36,8 +36,6 @@ Edits aren't complete until all four pass on the working tree:
 Run them in this order: format first (changes the bytes lint and check see), then lint (fast feedback on obvious bugs), then check (catches type regressions across `.astro`/`.ts`/`.vue`), then fallow (surfaces health issues the other three miss). Fix and rerun until each is clean before declaring the task done.
 
 ## Architecture
-
-The planning docs at `docs/{README,DESIGN,DATA_MODEL,AUTH}.md` are the contract. Read them before non-trivial work — they explain _why_ decisions were made.
 
 **SSR is the authority.** The home page (`src/pages/index.astro`) reads `?q`, `?tags`, `?untagged`, `?source` from the URL and runs the stream + tag-list queries server-side. Vue islands (5 of them — `Composer`, `SideTag`/`ColorPicker`, `ThemeToggle`, `SearchInput`, `LoginForm`) handle interactivity only; they never own the stream's render. `SearchInput` debounces input and hands off to Astro's view-transition router — there is no client-side stream patching, by design.
 

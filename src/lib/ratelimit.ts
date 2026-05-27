@@ -5,16 +5,26 @@ export type Bucket = {
   windowMs: number;
   max: number;
   hits: Map<string, { count: number; resetAt: number }>;
+  nextSweepAt: number;
 };
 
 export type CheckResult = { ok: true } | { ok: false; retryAfter: number };
 
 export function createBucket(windowMs: number, max: number): Bucket {
-  return { windowMs, max, hits: new Map() };
+  return { windowMs, max, hits: new Map(), nextSweepAt: 0 };
+}
+
+function sweepIfDue(bucket: Bucket, now: number): void {
+  if (now < bucket.nextSweepAt) return;
+  for (const [key, entry] of bucket.hits) {
+    if (entry.resetAt <= now) bucket.hits.delete(key);
+  }
+  bucket.nextSweepAt = now + bucket.windowMs;
 }
 
 export function checkRate(bucket: Bucket, key: string): CheckResult {
   const now = Date.now();
+  sweepIfDue(bucket, now);
   const entry = bucket.hits.get(key);
   if (!entry || entry.resetAt <= now) {
     bucket.hits.set(key, { count: 1, resetAt: now + bucket.windowMs });

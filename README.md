@@ -2,8 +2,6 @@
 
 A notebook that doesn't ask anything of you — a reverse-chronological stream of ideas, tagged by hashtag, captured by text or voice. Astro 6 SSR + Vue islands + Drizzle on bun:sqlite + Better Auth (passkey-only).
 
-Planning docs live under [`docs/`](./docs/).
-
 ## Local setup
 
 Requires **Bun** (the runtime, not just the package manager) — `bun:sqlite` is a Bun built-in.
@@ -39,5 +37,3 @@ Then visit `http://localhost:4321` — you'll be redirected to `/login`. Registe
 - **bun:sqlite** + Drizzle — single connection (`src/lib/db/client.ts`); WAL + foreign keys on at boot.
 - **Better Auth** with the passkey plugin only; wired via the Drizzle adapter so auth tables share one migration history with app tables.
 - **Tag colors** are OKLCH — each tag carries a hue 0–360; cards, chips, sidebar dots, stamps all derive their final color via theme-scoped L/C tokens.
-
-See [`docs/DESIGN.md`](./docs/DESIGN.md), [`docs/DATA_MODEL.md`](./docs/DATA_MODEL.md), and [`docs/AUTH.md`](./docs/AUTH.md) for the contract.

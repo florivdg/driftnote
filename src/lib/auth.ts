@@ -1,8 +1,8 @@
 import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { mcp } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
-import { nanoid } from "nanoid";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import * as authSchema from "@/lib/db/auth-schema";
@@ -46,7 +46,7 @@ async function createNewUserByEmail(name: string, email: string) {
       "An account with this email already exists. Sign in instead.",
     );
   }
-  const id = nanoid();
+  const id = Bun.randomUUIDv7();
   const now = new Date();
   await db.insert(userTable).values({
     id,
@@ -85,6 +85,12 @@ function parseSignupContext(context: unknown): { name: string; email: string } {
   return { name, email };
 }
 
+// MCP Inspector runs at :6274 and POSTs cross-origin to /api/auth/mcp/*.
+// Better Auth's CSRF gate (validateOrigin) rejects unknown origins; trust the
+// Inspector in dev only. Prod MCP clients are machine-to-machine and don't
+// send an Origin header, so this list stays empty there.
+const trustedOrigins = import.meta.env.DEV ? ["http://localhost:6274"] : [];
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "sqlite",
@@ -92,6 +98,7 @@ export const auth = betterAuth({
   }),
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL,
+  trustedOrigins,
   emailAndPassword: { enabled: false },
   socialProviders: {},
   plugins: [
@@ -109,6 +116,16 @@ export const auth = betterAuth({
           const { name, email } = parseSignupContext(context);
           return createNewUserByEmail(name, email);
         },
+      },
+    }),
+    mcp({
+      loginPage: "/login",
+      resource: `${baseURL}/api/mcp`,
+      oidcConfig: {
+        loginPage: "/login",
+        consentPage: "/mcp/consent",
+        requirePKCE: true,
+        allowDynamicClientRegistration: true,
       },
     }),
   ],
