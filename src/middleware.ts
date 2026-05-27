@@ -3,7 +3,16 @@ import type { APIContext } from "astro";
 import { auth } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 
-const PUBLIC = [/^\/login$/, /^\/api\/auth(\/|$)/, /^\/_astro\//, /^\/favicon/];
+const PUBLIC = [
+  /^\/login$/,
+  /^\/api\/auth(\/|$)/,
+  // /api/mcp gates itself via withMcpAuth (OAuth bearer token), not the session
+  // cookie. TODO: add Origin allow-list for DNS-rebinding once non-localhost.
+  /^\/api\/mcp(\/|$)/,
+  /^\/\.well-known\//,
+  /^\/_astro\//,
+  /^\/favicon/,
+];
 
 const IS_PROD = import.meta.env.PROD;
 

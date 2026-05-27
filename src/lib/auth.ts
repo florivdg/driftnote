@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { mcp } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
 import { nanoid } from "nanoid";
 import { eq } from "drizzle-orm";
@@ -109,6 +110,15 @@ export const auth = betterAuth({
           const { name, email } = parseSignupContext(context);
           return createNewUserByEmail(name, email);
         },
+      },
+    }),
+    mcp({
+      loginPage: "/login",
+      resource: `${baseURL}/api/mcp`,
+      oidcConfig: {
+        loginPage: "/login",
+        consentPage: "/mcp/consent",
+        requirePKCE: true,
       },
     }),
   ],

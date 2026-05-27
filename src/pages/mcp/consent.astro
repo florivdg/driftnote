@@ -1,0 +1,133 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { db } from "@/lib/db/client";
+import { oauthApplication } from "@/lib/db/auth-schema";
+import { eq } from "drizzle-orm";
+
+export const prerender = false;
+
+const url = Astro.url;
+const consentCode = url.searchParams.get("consent_code") ?? "";
+const clientId = url.searchParams.get("client_id") ?? "";
+const scope = url.searchParams.get("scope") ?? "";
+const scopes = scope.split(" ").filter(Boolean);
+
+const client = clientId
+  ? db
+      .select({ name: oauthApplication.name })
+      .from(oauthApplication)
+      .where(eq(oauthApplication.clientId, clientId))
+      .get()
+  : null;
+const clientName = client?.name ?? clientId ?? "an unknown client";
+
+const missingParams = !consentCode || !clientId;
+---
+
+<Layout title="DriftNote · Authorize MCP client">
+  <main id="main" class="consent" tabindex="-1">
+    {
+      missingParams ? (
+        <section class="consent-card">
+          <h1>Invalid consent request</h1>
+          <p>This authorization link is missing required parameters.</p>
+          <p>
+            <a href="/">Return to DriftNote</a>
+          </p>
+        </section>
+      ) : (
+        <section class="consent-card">
+          <h1>Authorize MCP client</h1>
+          <p>
+            <strong>{clientName}</strong> is requesting access to your DriftNote
+            notebook.
+          </p>
+          <h2>It will be able to:</h2>
+          <ul>
+            {scopes.map((s) => (
+              <li>{s}</li>
+            ))}
+            <li>Read every note and tag you've saved</li>
+          </ul>
+          <p>
+            Only approve clients you trust. You can revoke access later by
+            deleting the OAuth client from the database.
+          </p>
+          <form
+            method="POST"
+            action="/api/oauth/consent"
+            class="consent-actions"
+          >
+            <input type="hidden" name="consent_code" value={consentCode} />
+            <button type="submit" name="accept" value="false" class="btn-deny">
+              Deny
+            </button>
+            <button type="submit" name="accept" value="true" class="btn-accept">
+              Approve
+            </button>
+          </form>
+        </section>
+      )
+    }
+  </main>
+</Layout>
+
+<style>
+  .consent {
+    max-width: 480px;
+    margin: 4rem auto;
+    padding: 0 1.5rem;
+  }
+  .consent-card {
+    border: 1px solid var(--border, #2a2a2a);
+    border-radius: 12px;
+    padding: 1.75rem 2rem;
+    background: var(--card-bg, transparent);
+  }
+  .consent-card h1 {
+    margin: 0 0 1rem;
+    font-size: 1.4rem;
+  }
+  .consent-card h2 {
+    margin: 1.5rem 0 0.5rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.7;
+  }
+  .consent-card ul {
+    margin: 0 0 1rem;
+    padding-left: 1.25rem;
+  }
+  .consent-card li {
+    margin: 0.25rem 0;
+  }
+  .consent-card p {
+    margin: 0 0 0.75rem;
+    line-height: 1.5;
+  }
+  .consent-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    justify-content: flex-end;
+  }
+  .consent-actions button {
+    padding: 0.55rem 1.25rem;
+    border-radius: 8px;
+    border: 1px solid var(--border, #2a2a2a);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  .btn-accept {
+    background: var(--accent, #5a8dee);
+    border-color: var(--accent, #5a8dee);
+    color: #fff;
+  }
+  .btn-deny:hover {
+    background: var(--border, #2a2a2a);
+  }
+</style>
