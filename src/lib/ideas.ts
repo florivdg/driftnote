@@ -195,6 +195,17 @@ export async function listIdeas(
   }));
 }
 
+export async function getTagHues(
+  userId: string,
+  names: string[],
+): Promise<{ name: string; hue: number }[]> {
+  if (names.length === 0) return [];
+  return await db
+    .select({ name: tags.name, hue: tags.hue })
+    .from(tags)
+    .where(and(eq(tags.userId, userId), inArray(tags.name, names)));
+}
+
 export async function listTagsWithCounts(
   userId: string,
 ): Promise<TagListEntry[]> {

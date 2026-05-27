@@ -18,6 +18,7 @@ import IdeaCard from "@/components/vue/IdeaCard.vue";
 const props = defineProps<{
   initial: {
     ideas: IdeaWithTags[];
+    activeTagHues: { name: string; hue: number }[];
     query: string;
     tags: string[];
     untagged: boolean;
@@ -26,6 +27,9 @@ const props = defineProps<{
 }>();
 
 const ideas = shallowRef<IdeaWithTags[]>(props.initial.ideas);
+const activeTagHues = shallowRef<{ name: string; hue: number }[]>(
+  props.initial.activeTagHues,
+);
 const filters = shallowRef<Filters>({
   q: props.initial.query,
   tags: props.initial.tags,
@@ -44,10 +48,16 @@ const hueByTagName = computed(() => {
   return map;
 });
 
+const activeTagHueMap = computed(
+  () => new Map(activeTagHues.value.map((t) => [t.name, t.hue])),
+);
+
+// Server-side hue is authoritative; fall back to the ideas-derived map so a
+// freshly created idea's tag colour shows up before the next stream refetch.
 const activeTagsWithHue = computed(() =>
   filters.value.tags.map((name) => ({
     name,
-    hue: hueByTagName.value.get(name),
+    hue: activeTagHueMap.value.get(name) ?? hueByTagName.value.get(name),
   })),
 );
 
@@ -63,7 +73,10 @@ async function loadIdeas(f: Filters): Promise<void> {
     const data = await fetcher.run((signal) =>
       fetchJSON<StreamResponse>(`/api/stream${search}`, signal),
     );
-    if (data) ideas.value = data.ideas;
+    if (data) {
+      ideas.value = data.ideas;
+      activeTagHues.value = data.activeTagHues;
+    }
   } catch (err) {
     console.error("stream fetch failed; falling back to reload", err);
     location.assign(`/${search}`);

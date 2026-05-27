@@ -1,5 +1,5 @@
 import type { APIRoute } from "astro";
-import { listIdeas, type StreamFilters } from "@/lib/ideas";
+import { getTagHues, listIdeas, type StreamFilters } from "@/lib/ideas";
 import { parseTags } from "@/lib/url";
 import { parseSourceParam } from "@/lib/validation";
 import { gateRead } from "@/lib/ratelimit";
@@ -17,6 +17,9 @@ export const GET: APIRoute = async ({ url, locals }) => {
     source: parseSourceParam(url.searchParams.get("source")),
   };
 
-  const ideas = await listIdeas(gate.user.id, filters);
-  return Response.json({ ideas });
+  const [ideas, activeTagHues] = await Promise.all([
+    listIdeas(gate.user.id, filters),
+    getTagHues(gate.user.id, filters.tags ?? []),
+  ]);
+  return Response.json({ ideas, activeTagHues });
 };

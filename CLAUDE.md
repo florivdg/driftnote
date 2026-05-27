@@ -59,7 +59,7 @@ Sidebar / StreamView / FilterStrip / IdeaCard all call `applyURL(...)` instead o
 
 **REST surface:**
 
-- `GET /api/stream?q=&tags=&untagged=&source=` → `{ ideas, suggestedTags }`. Filter-dependent.
+- `GET /api/stream?q=&tags=&untagged=&source=` → `{ ideas, activeTagHues }`. Filter-dependent. `activeTagHues` echoes the `hue` for each `?tags=` value so `StreamView` can colour the FilterStrip chips even when no idea matches.
 - `GET /api/tags` → `{ tagList, totalIdeas, untaggedCount, voiceCount }`. Filter-independent; refetched only after `streamchanged`.
 - `POST /api/ideas`, `PATCH /api/tags/[name]` — unchanged.
 

@@ -52,6 +52,11 @@ const suggestedTags = tagList
   .slice(0, 4)
   .map((t) => t.name);
 
+const tagHueByName = new Map(tagList.map((t) => [t.name, t.hue]));
+const activeTagHues = activeTagNames
+  .map((name) => ({ name, hue: tagHueByName.get(name) }))
+  .filter((t): t is { name: string; hue: number } => t.hue !== undefined);
+
 const MO = [
   "January",
   "February",
@@ -83,6 +88,7 @@ const sidebarInitial = {
 
 const streamInitial = {
   ideas,
+  activeTagHues,
   query: q,
   tags: activeTagNames,
   untagged,
