@@ -215,6 +215,15 @@ export async function listTagsWithCounts(
   return rows;
 }
 
+export async function countIdeas(userId: string): Promise<number> {
+  const row = db
+    .select({ n: sql<number>`COUNT(*)` })
+    .from(ideas)
+    .where(eq(ideas.userId, userId))
+    .get();
+  return row?.n ?? 0;
+}
+
 export async function countUntagged(userId: string): Promise<number> {
   const row = db
     .select({ n: sql<number>`COUNT(*)` })

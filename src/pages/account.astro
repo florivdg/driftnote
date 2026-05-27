@@ -2,7 +2,7 @@
 import Layout from "@/layouts/Layout.astro";
 import Masthead from "@/components/Masthead.astro";
 import AccountActions from "@/components/islands/AccountActions.vue";
-import { listTagsWithCounts } from "@/lib/ideas";
+import { countIdeas, listTagsWithCounts } from "@/lib/ideas";
 import { issueNumber } from "@/lib/issueNumber";
 
 export const prerender = false;
@@ -12,13 +12,11 @@ if (!user) {
   return Astro.redirect("/login?next=/account");
 }
 
-const tagList = await listTagsWithCounts(user.id);
-let totalIdeas = 0;
-let visibleTagCount = 0;
-for (const t of tagList) {
-  totalIdeas += t.count;
-  if (t.count > 0) visibleTagCount += 1;
-}
+const [totalIdeas, tagList] = await Promise.all([
+  countIdeas(user.id),
+  listTagsWithCounts(user.id),
+]);
+const visibleTagCount = tagList.filter((t) => t.count > 0).length;
 
 const issueNo = String(issueNumber()).padStart(3, "0");
 const firstName = (user.name ?? user.email ?? "you").split(/\s+/)[0];

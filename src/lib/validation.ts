@@ -4,16 +4,66 @@ export type ParsedOr<T> = { ok: true; value: T } | { ok: false; res: Response };
 
 const MAX_BODY_BYTES = 32_000;
 
-async function readJson(req: Request): Promise<ParsedOr<unknown>> {
+function tooLarge(): ParsedOr<never> {
+  return {
+    ok: false,
+    res: new Response("Payload too large", { status: 413 }),
+  };
+}
+
+function concatChunks(chunks: Uint8Array[], total: number): Uint8Array {
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    out.set(c, offset);
+    offset += c.byteLength;
+  }
+  return out;
+}
+
+function headerExceedsLimit(req: Request): boolean {
   const len = Number(req.headers.get("content-length"));
-  if (Number.isFinite(len) && len > MAX_BODY_BYTES) {
-    return {
-      ok: false,
-      res: new Response("Payload too large", { status: 413 }),
-    };
+  return Number.isFinite(len) && len > MAX_BODY_BYTES;
+}
+
+async function drainBounded(
+  reader: ReadableStreamDefaultReader<Uint8Array>,
+): Promise<ParsedOr<{ chunks: Uint8Array[]; total: number }>> {
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return tooLarge();
+    }
+    chunks.push(value);
+  }
+  return { ok: true, value: { chunks, total } };
+}
+
+async function readBoundedBody(req: Request): Promise<ParsedOr<string>> {
+  if (headerExceedsLimit(req)) return tooLarge();
+  if (!req.body) return { ok: true, value: "" };
+  const drained = await drainBounded(req.body.getReader());
+  if (!drained.ok) return drained;
+  const { chunks, total } = drained.value;
+  return {
+    ok: true,
+    value: new TextDecoder().decode(concatChunks(chunks, total)),
+  };
+}
+
+async function readJson(req: Request): Promise<ParsedOr<unknown>> {
+  const body = await readBoundedBody(req);
+  if (!body.ok) return body;
+  if (body.value === "") {
+    return { ok: false, res: new Response("Invalid JSON", { status: 400 }) };
   }
   try {
-    return { ok: true, value: await req.json() };
+    return { ok: true, value: JSON.parse(body.value) };
   } catch {
     return { ok: false, res: new Response("Invalid JSON", { status: 400 }) };
   }

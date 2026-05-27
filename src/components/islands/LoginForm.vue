@@ -15,8 +15,25 @@ const buttonDisabled = computed(() => {
   return false;
 });
 
+function hasControlChar(s: string): boolean {
+  for (let i = 0; i < s.length; i++) {
+    if (s.charCodeAt(i) < 32) return true;
+  }
+  return false;
+}
+
+function isSafeRelative(raw: string): boolean {
+  if (!raw.startsWith("/")) return false;
+  if (raw.startsWith("//") || raw.startsWith("/\\")) return false;
+  return !hasControlChar(raw);
+}
+
+function safeNext(raw: string | null): string {
+  return raw && isSafeRelative(raw) ? raw : "/";
+}
+
 function redirect() {
-  const next = new URL(location.href).searchParams.get("next") ?? "/";
+  const next = safeNext(new URL(location.href).searchParams.get("next"));
   navigate(next, { history: "push" });
 }
 
