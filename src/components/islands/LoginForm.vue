@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { navigate } from "astro:transitions/client";
 import { authClient, unwrapAuthResult } from "@/lib/auth-client";
 
 const mode = ref<"signin" | "signup">("signin");
@@ -34,7 +33,7 @@ function safeNext(raw: string | null): string {
 
 function redirect() {
   const next = safeNext(new URL(location.href).searchParams.get("next"));
-  navigate(next, { history: "push" });
+  location.assign(next);
 }
 
 async function performSignIn() {
@@ -178,12 +177,7 @@ async function trigger() {
       </template>
     </button>
 
-    <p
-      v-if="error"
-      class="sub"
-      style="color: var(--hot); margin-top: 8px"
-      role="alert"
-    >
+    <p v-if="error" class="sub login-error" role="alert">
       {{ error }}
     </p>
   </form>

@@ -710,6 +710,8 @@ body[data-theme="dark"] .theme-toggle .knob {
 .composer:focus-within {
   border-color: var(--rule-strong);
   background: var(--surface-2);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .composer-body {
   position: relative;
@@ -728,6 +730,9 @@ body[data-theme="dark"] .theme-toggle .knob {
   line-height: 1.35;
   color: var(--ink);
   letter-spacing: -0.015em;
+}
+.composer-body textarea:focus-visible {
+  outline: none;
 }
 .composer-body textarea::placeholder {
   color: var(--ink-3);
@@ -1944,4 +1949,115 @@ body[data-theme="dark"] .theme-toggle .knob {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ---------- CSP-clean dynamics ----------
+   Strict style-src forbids inline style="..." attributes. Components emit
+   data attributes; these rules translate them into CSS custom properties
+   that existing component styles already consume (var(--hue), --stripe,
+   --tint, --popover-top/left/right).
+
+   Hue values are sourced from HUE_CHOICES in src/lib/tags.ts; if that array
+   grows, add a matching row here. */
+
+[data-hue="10"] {
+  --hue: 10;
+}
+[data-hue="30"] {
+  --hue: 30;
+}
+[data-hue="50"] {
+  --hue: 50;
+}
+[data-hue="80"] {
+  --hue: 80;
+}
+[data-hue="110"] {
+  --hue: 110;
+}
+[data-hue="140"] {
+  --hue: 140;
+}
+[data-hue="170"] {
+  --hue: 170;
+}
+[data-hue="195"] {
+  --hue: 195;
+}
+[data-hue="220"] {
+  --hue: 220;
+}
+[data-hue="245"] {
+  --hue: 245;
+}
+[data-hue="280"] {
+  --hue: 280;
+}
+[data-hue="320"] {
+  --hue: 320;
+}
+[data-hue="350"] {
+  --hue: 350;
+}
+
+.entry[data-hue] {
+  --stripe: oklch(var(--tag-stripe-L) var(--tag-stripe-C) var(--hue));
+  --tint: oklch(var(--tag-tint-L) var(--tag-tint-C) var(--hue));
+}
+
+.color-swatch[data-hue] {
+  background: oklch(var(--tag-mark-L) var(--tag-mark-C) var(--hue));
+}
+
+.dot--ink {
+  background: var(--ink);
+}
+
+.login-error {
+  color: var(--hot);
+  margin-top: 8px;
+}
+
+.composer-add-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  align-self: center;
+}
+
+.voice-wave span:nth-child(8n + 1) {
+  animation-delay: 0s;
+}
+.voice-wave span:nth-child(8n + 2) {
+  animation-delay: 0.08s;
+}
+.voice-wave span:nth-child(8n + 3) {
+  animation-delay: 0.16s;
+}
+.voice-wave span:nth-child(8n + 4) {
+  animation-delay: 0.24s;
+}
+.voice-wave span:nth-child(8n + 5) {
+  animation-delay: 0.32s;
+}
+.voice-wave span:nth-child(8n + 6) {
+  animation-delay: 0.4s;
+}
+.voice-wave span:nth-child(8n + 7) {
+  animation-delay: 0.48s;
+}
+.voice-wave span:nth-child(8n + 8) {
+  animation-delay: 0.56s;
+}
+
+/* Popover positions come from JS via setProperty (CSSOM, CSP-clean). */
+.color-picker {
+  top: var(--popover-top);
+  left: var(--popover-left);
+}
+.user-menu {
+  top: var(--popover-top);
+  right: var(--popover-right);
 }

@@ -37,13 +37,37 @@ Run them in this order: format first (changes the bytes lint and check see), the
 
 ## Architecture
 
-**SSR is the authority.** The home page (`src/pages/index.astro`) reads `?q`, `?tags`, `?untagged`, `?source` from the URL and runs the stream + tag-list queries server-side. Vue islands (5 of them — `Composer`, `SideTag`/`ColorPicker`, `ThemeToggle`, `SearchInput`, `LoginForm`) handle interactivity only; they never own the stream's render. `SearchInput` debounces input and hands off to Astro's view-transition router — there is no client-side stream patching, by design.
+**SSR renders the page shell _and_ each island's initial state.** The home page (`src/pages/index.astro`) reads `?q`, `?tags`, `?untagged`, `?source` from the URL, runs the stream + tag-list queries server-side, and passes the results as `initial` props to the Vue islands. Each `client:load` island is rendered to HTML at SSR-time and hydrates over it — no fetch on first paint, no skeleton.
 
-**Navigation uses Astro's `<ClientRouter />` (view transitions).** Rendered once in `Layout.astro`'s `<head>`. Every link, form, and programmatic `navigate(...)` triggers an SSR fetch + DOM swap rather than a full page reload. Three consequences worth knowing before editing:
+The home page mounts three top-level Vue islands plus the chrome:
 
-1. `SearchInput` is mounted with `transition:persist` in `Masthead.astro` so the input's DOM node and Vue state survive the swap — focus and caret stay where the user left them between keystrokes. Other islands re-hydrate on each swap.
-2. Programmatic navigation from islands must call `navigate()` from `astro:transitions/client`, not `location.assign` / `location.href`. The router does not intercept raw `location.*` writes — using them causes a full reload and defeats `transition:persist`.
-3. Inline `<script is:inline>` blocks do **not** re-run after a swap by default. Anything that must run on every page (the `Layout.astro` FOUC-killer is the current example) needs `data-astro-rerun`. Changing the script body still requires re-hashing for CSP via `bun scripts/csp-fouc-hash.ts`; the attribute does not affect the hash.
+- `<Sidebar />` (`src/components/islands/Sidebar.vue`) — owns the filter nav, tag list, and tag-color picker.
+- `<StreamView />` (`src/components/islands/StreamView.vue`) — owns the FilterStrip, day groups, idea cards, and empty state.
+- `<Composer />` — unchanged shape; on submit it dispatches a `streamchanged` event instead of navigating.
+
+Plus `<SearchInput />`, `<ThemeToggle />`, `<UserMenu />` in the masthead.
+
+**URL is the single source of truth for filters.** `src/lib/url-state.ts` is the glue:
+
+- `applyURL(href, mode?)` — `history.pushState` (or `replaceState`) + dispatches a `urlchange` window event.
+- `subscribeFilters(handler)` — handler runs on every `urlchange` and on `popstate`, with the parsed `Filters` for the new URL.
+- `currentFilters()` / `readFilters(url)` / `filtersToSearch(filters)` — pure helpers on top of `src/lib/url.ts`.
+
+Sidebar / StreamView / FilterStrip / IdeaCard all call `applyURL(...)` instead of navigating. Anchors keep their `href` so middle-click / cmd-click still open a new tab; the primary click handler calls `applyURL` with `event.preventDefault()`.
+
+**Mutations dispatch `streamchanged`.** After a successful `POST /api/ideas` (Composer) or `PATCH /api/tags/[name]` (Sidebar's color picker), the originating island calls `notifyStreamChanged()` from `url-state.ts`. `StreamView` listens and refetches `GET /api/stream`; `Sidebar` listens and refetches `GET /api/tags`. Both fetchers reset a single `AbortController` per call, so fast typing or rapid mutations don't race.
+
+**REST surface:**
+
+- `GET /api/stream?q=&tags=&untagged=&source=` → `{ ideas, suggestedTags }`. Filter-dependent.
+- `GET /api/tags` → `{ tagList, totalIdeas, untaggedCount, voiceCount }`. Filter-independent; refetched only after `streamchanged`.
+- `POST /api/ideas`, `PATCH /api/tags/[name]` — unchanged.
+
+The masthead's "N ENTRIES / N TAGS" counters and the issue header's "N unfinished thoughts" come from SSR and stay stable until the next full reload — by design, those are headline copy, not live counters.
+
+**All other navigation is plain browser navigation.** No client-side router. Login redirects, sign-out, and MCP consent use `location.assign(...)`. `<a href>` links cause full page loads.
+
+**FOUC-killer script** in `Layout.astro`'s `<body>` runs once per page load — no view transitions, no `data-astro-rerun`. Its body is CSP-hashed via `bun scripts/csp-fouc-hash.ts`; if the script body changes, re-run that and update `security.csp.scriptDirective.hashes` in `astro.config.mjs`.
 
 **One Drizzle client, one SQLite connection.** `src/lib/db/client.ts` constructs a single `bun:sqlite` `Database`, runs `PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON`, and exports `db`. App tables (`ideas`, `tags`, `idea_tags`) live in `src/lib/db/schema.ts`; Better Auth tables (`user`, `session`, `account`, `verification`, `passkey`) are re-exported from `auth-schema.ts`. `drizzle-kit` sees both, so there is one unified migration history under `./drizzle/`.
 
@@ -57,7 +81,7 @@ Run them in this order: format first (changes the bytes lint and check see), the
 
 **Middleware** (`src/middleware.ts`) attaches the session to `ctx.locals.{user, session}` on every request, then decides: pass, redirect to `/login?next=…`, or return a JSON 401. API routes (`/api/*`) get 401, page routes get the redirect. Routes in `PUBLIC` (login, `/api/auth/*`, static assets) skip the user check.
 
-**Tag colors are derived, not stored.** Each tag has one integer `hue` (0–360). Theme-scoped CSS variables (`--tag-stripe-L/C`, `--tag-tint-L/C`, etc.) combine with that hue to render the card stripe, tint, sidebar dot, and stamps. Unknown tags get a deterministic hue from `defaultHueFor()` (FNV-1a hash of the name into `HUE_CHOICES`). When a user picks a new color, `PATCH /api/tags/[name]` updates the row and the SideTag island reloads so all SSR'd cards refresh together.
+**Tag colors are derived, not stored.** Each tag has one integer `hue` (0–360). Theme-scoped CSS variables (`--tag-stripe-L/C`, `--tag-tint-L/C`, etc.) combine with that hue to render the card stripe, tint, sidebar dot, and stamps. Unknown tags get a deterministic hue from `defaultHueFor()` (FNV-1a hash of the name into `HUE_CHOICES`). When a user picks a new color, `PATCH /api/tags/[name]` updates the row, the Sidebar dispatches `streamchanged`, and both `StreamView` and `Sidebar` refetch so all card stripes / stamps / dots reflect the new hue.
 
 **`bun x auth@latest`** must be invoked with `bunx --bun` to run under the Bun runtime — same `bun:sqlite` constraint as `astro dev`.
 
