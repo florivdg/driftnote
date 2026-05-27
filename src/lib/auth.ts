@@ -3,7 +3,6 @@ import { APIError } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { mcp } from "better-auth/plugins";
 import { passkey } from "@better-auth/passkey";
-import { nanoid } from "nanoid";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import * as authSchema from "@/lib/db/auth-schema";
@@ -47,7 +46,7 @@ async function createNewUserByEmail(name: string, email: string) {
       "An account with this email already exists. Sign in instead.",
     );
   }
-  const id = nanoid();
+  const id = Bun.randomUUIDv7();
   const now = new Date();
   await db.insert(userTable).values({
     id,

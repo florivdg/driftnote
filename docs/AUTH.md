@@ -75,7 +75,7 @@ export const auth = betterAuth({
 > internal user-creation helper. Two viable shapes:
 >
 > 1. `await auth.api.signUpEmail(...)` — won't work, passwords disabled.
-> 2. Direct Drizzle insert into `user` (id = `nanoid()`, emailVerified = false).
+> 2. Direct Drizzle insert into `user` (id = `Bun.randomUUIDv7()`, emailVerified = false).
 >
 > Confirm against Better Auth's `createUser` ctx helper during implementation;
 > the plugin's `ctx` argument exposes it. Filed as TODO in the implementation

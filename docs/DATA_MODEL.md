@@ -54,7 +54,7 @@ Relevant columns for app code:
 
 | Column      | Type                                           | Notes                                      |
 | ----------- | ---------------------------------------------- | ------------------------------------------ |
-| `id`        | text PK                                        | `nanoid()` or `crypto.randomUUID()`.       |
+| `id`        | text PK                                        | `Bun.randomUUIDv7()` (time-ordered UUID).  |
 | `userId`    | text NOT NULL FK → `user.id` ON DELETE CASCADE |                                            |
 | `body`      | text NOT NULL                                  | Raw text including hashtags.               |
 | `source`    | text NOT NULL DEFAULT `'text'`                 | CHECK `IN ('text','voice')`.               |
@@ -111,7 +111,7 @@ const extracted = extractTags(text); // ported from data.jsx
 const now = Date.now();
 
 await db.transaction(async (tx) => {
-  const ideaId = nanoid();
+  const ideaId = Bun.randomUUIDv7();
   await tx.insert(ideas).values({
     id: ideaId,
     userId,
@@ -128,7 +128,7 @@ await db.transaction(async (tx) => {
       .from(tags)
       .where(and(eq(tags.userId, userId), eq(tags.name, name)))
       .get();
-    const tagId = existing?.id ?? nanoid();
+    const tagId = existing?.id ?? Bun.randomUUIDv7();
     if (!existing) {
       await tx.insert(tags).values({
         id: tagId,
