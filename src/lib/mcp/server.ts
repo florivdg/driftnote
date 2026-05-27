@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { z } from "zod";
-import { listIdeas, type IdeaWithTags } from "@/lib/ideas";
+import { listIdeas, listTagsWithCounts } from "@/lib/ideas";
 import { checkRate, readBucket } from "@/lib/ratelimit";
 import { audit } from "@/lib/audit";
 
@@ -15,7 +15,7 @@ const limitSchema = z
   .default(50)
   .describe("Maximum number of notes to return (1..200, default 50).");
 
-function jsonResult(payload: IdeaWithTags[]) {
+function jsonResult(payload: unknown) {
   return {
     content: [{ type: "text" as const, text: JSON.stringify(payload) }],
   };
@@ -112,6 +112,20 @@ function buildServer(session: McpSession): McpServer {
     async ({ q, limit }) =>
       gate(userId, "search_notes", async () =>
         jsonResult(await listIdeas(userId, { q, limit })),
+      ),
+  );
+
+  server.registerTool(
+    "get_tags",
+    {
+      title: "Get tags",
+      description:
+        "List all of the signed-in user's tags with usage counts and hue (0–360). Ordered by usage desc, then name asc.",
+      inputSchema: {},
+    },
+    async () =>
+      gate(userId, "get_tags", async () =>
+        jsonResult(await listTagsWithCounts(userId)),
       ),
   );
 
