@@ -102,10 +102,12 @@ import { createAuthClient } from "better-auth/client";
 import { passkeyClient } from "@better-auth/passkey/client";
 
 export const authClient = createAuthClient({
-  baseURL: import.meta.env.PUBLIC_BETTER_AUTH_URL,
+  baseURL: window.location.origin,
   plugins: [passkeyClient()],
 });
 ```
+
+`window.location.origin` is the runtime origin the browser already resolved, so the same image works behind any reverse proxy / hostname without rebuilds. The file is only ever imported by client islands, so `window` is guaranteed to exist at module-eval time.
 
 Used inside the Vue login island:
 

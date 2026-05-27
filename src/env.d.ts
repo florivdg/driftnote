@@ -18,7 +18,6 @@ declare namespace App {
 }
 
 interface ImportMetaEnv {
-  readonly PUBLIC_BETTER_AUTH_URL: string;
   readonly BETTER_AUTH_SECRET: string;
   readonly BETTER_AUTH_URL: string;
 }

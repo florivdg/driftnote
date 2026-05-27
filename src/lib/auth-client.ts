@@ -2,7 +2,7 @@ import { createAuthClient } from "better-auth/client";
 import { passkeyClient } from "@better-auth/passkey/client";
 
 export const authClient = createAuthClient({
-  baseURL: import.meta.env.PUBLIC_BETTER_AUTH_URL,
+  baseURL: window.location.origin,
   plugins: [passkeyClient()],
 });
 

@@ -81,3 +81,11 @@ And one inline suppression: `// fallow-ignore-next-line unresolved-import` above
 `src/styles/driftnote.css` was copied from the source design bundle at `~/Downloads/DriftNote/styles.css` (whitespace is now Prettier-controlled, but the rules and selectors haven't been edited). The token block at the top (`:root`, `body[data-theme="light"]`, `[data-density]`) is the contract — components depend on its variable names. Refactor only if a component genuinely diverges from the original markup.
 
 Theme / density / sidebar side persist in `localStorage` (`driftnote_theme`, `driftnote_density`, `driftnote_sidebar`) — read by an inline FOUC-killer script at the top of `Layout.astro`'s `<body>`. No `user_prefs` table in v1.
+
+## Docker
+
+Prod runtime is containerized via the root `Dockerfile` on Docker Hardened Images (`dhi/bun` for runtime, `dhi/bun:*-dev` for build). See `docs/DOCKER.md` for build/run/env details. Three things that bite if forgotten:
+
+1. The runtime image has **no shell**. `docker exec ... sh` fails by design — use `docker debug <container>` or `docker exec ... bun -e "..."` instead. The `HEALTHCHECK` uses `bun -e fetch(...)` for the same reason; don't replace it with `curl`.
+2. `src/lib/db/client.ts` hard-codes `./data/driftnote.db`, so `/app/data` must be a writable volume (compose declares `driftnote_data`). `.dockerignore` excludes `./data/` — without that exclusion the local dev DB would be baked into the image.
+3. Migrations run on container start via `scripts/serve.ts` (migrate → `await import("../dist/server/entry.mjs")`). There is no separate migration step in the prod flow; if you add a migration that needs a different ordering (e.g. zero-downtime), revisit that script rather than the Dockerfile.
