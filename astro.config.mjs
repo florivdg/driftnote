@@ -16,7 +16,13 @@ export default defineConfig({
   // CSP is build-only — `astro dev` will NOT emit the header (Vite HMR uses
   // unnonced inline scripts). Test via `bun run build && bun run start`.
   // Other security headers (X-Frame-Options, etc.) ship from src/middleware.ts.
+  //
+  // `checkOrigin: false` disables Astro's blanket cross-origin form-POST
+  // rejection, which is incompatible with OAuth (token, register, etc. are
+  // spec'd cross-origin). src/middleware.ts re-implements the same check with
+  // /api/auth/* and /api/mcp/* exempted.
   security: {
+    checkOrigin: false,
     csp: {
       algorithm: "SHA-256",
       directives: [

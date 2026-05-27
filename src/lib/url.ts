@@ -54,3 +54,23 @@ export function setFlag(
   else params.set(key, value);
   return `${url.pathname}${buildSearch(params)}`;
 }
+
+const LOCALHOST_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+function safeParseUrl(s: string): URL | null {
+  try {
+    return new URL(s);
+  } catch {
+    return null;
+  }
+}
+
+// Rejects javascript:, data:, etc. so a malicious OAuth client cannot
+// register a redirect_uri that executes script when the consent page
+// navigates to it via location.assign.
+export function isAllowedRedirectUri(uri: string): boolean {
+  const parsed = safeParseUrl(uri);
+  if (!parsed) return false;
+  if (parsed.protocol === "https:") return true;
+  return parsed.protocol === "http:" && LOCALHOST_HOSTS.has(parsed.hostname);
+}
