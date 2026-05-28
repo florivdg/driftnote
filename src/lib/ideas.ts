@@ -381,16 +381,10 @@ async function mergeTagLinks(
   sourceId: string,
   targetId: string,
 ): Promise<void> {
-  const links = await tx
-    .select({ ideaId: ideaTags.ideaId })
-    .from(ideaTags)
-    .where(eq(ideaTags.tagId, sourceId));
-  for (const { ideaId } of links) {
-    await tx
-      .insert(ideaTags)
-      .values({ ideaId, tagId: targetId })
-      .onConflictDoNothing();
-  }
+  tx.run(
+    sql`INSERT OR IGNORE INTO idea_tags (idea_id, tag_id)
+        SELECT idea_id, ${targetId} FROM idea_tags WHERE tag_id = ${sourceId}`,
+  );
   await tx.delete(tags).where(eq(tags.id, sourceId));
 }
 

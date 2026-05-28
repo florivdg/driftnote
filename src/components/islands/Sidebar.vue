@@ -12,6 +12,7 @@ import type { TagListEntry } from "@/lib/ideas";
 import type { TagsResponse } from "@/lib/api-types";
 import { setFlag, toggleTag } from "@/lib/url";
 import {
+  applyURL,
   filtersToSearch,
   interceptNav,
   notifyStreamChanged,
@@ -19,7 +20,7 @@ import {
   subscribeStreamChanged,
   type Filters,
 } from "@/lib/url-state";
-import { HUE_CHOICES } from "@/lib/tags";
+import { HUE_CHOICES, normalizeTagName } from "@/lib/tags";
 import { createAbortableFetcher, fetchJSON } from "@/lib/fetcher";
 
 const props = defineProps<{
@@ -111,11 +112,15 @@ function openPicker(e: MouseEvent, name: string) {
   }, 0);
   void nextTick().then(() => {
     const picker = pickerEl();
-    if (picker) {
-      picker.style.setProperty("--popover-top", `${r.top + r.height / 2}px`);
-      picker.style.setProperty("--popover-left", `${r.right + 8}px`);
-      picker.querySelector<HTMLElement>("button")?.focus();
-    }
+    if (!picker) return;
+    // Clamp the vertically-centered popover so a tall editor near the top or
+    // bottom edge stays fully on-screen.
+    const half = picker.offsetHeight / 2;
+    const center = r.top + r.height / 2;
+    const top = Math.min(Math.max(center, half + 8), innerHeight - half - 8);
+    picker.style.setProperty("--popover-top", `${top}px`);
+    picker.style.setProperty("--popover-left", `${r.right + 8}px`);
+    picker.querySelector<HTMLElement>(".cp-rename-input")?.focus();
   });
 }
 
@@ -167,7 +172,30 @@ function jsonPatch(body: unknown): RequestInit {
   };
 }
 
+// Keep the URL's ?tags= filter in sync when the tag it points at is renamed
+// (newName) or deleted (null); otherwise the stream refetches against a tag
+// that no longer exists and goes empty with a dangling filter chip.
+function syncActiveFilter(oldName: string, newName: string | null) {
+  if (!filters.value.tags.includes(oldName)) return;
+  const nextTags = newName
+    ? [...new Set(filters.value.tags.map((t) => (t === oldName ? newName : t)))]
+    : filters.value.tags.filter((t) => t !== oldName);
+  applyURL(
+    `/${filtersToSearch({ ...filters.value, tags: nextTags })}`,
+    "replace",
+  );
+}
+
+// If the open editor's tag is no longer rendered (deleted, or dropped to count
+// 0 while unused are hidden), its popover unmounts; close it so the document
+// listeners don't leak.
+function closePickerIfGone(): void {
+  const open = pickerOpenFor.value;
+  if (open && !visible.value.some((t) => t.name === open)) closePicker();
+}
+
 async function pickHue(name: string, h: number) {
+  confirmingDelete.value = false;
   if (!(await tagRequest(name, jsonPatch({ hue: h })))) return;
   tagList.value = tagList.value.map((t) =>
     t.name === name ? { ...t, hue: h } : t,
@@ -177,13 +205,15 @@ async function pickHue(name: string, h: number) {
 }
 
 async function submitRename(oldName: string) {
-  const next = editName.value.trim().toLowerCase();
+  confirmingDelete.value = false;
+  const next = normalizeTagName(editName.value).replace(/^#+/, "");
   if (!next || next === oldName) {
     closePicker();
     return;
   }
   if (!(await tagRequest(oldName, jsonPatch({ name: next })))) return;
   closePicker();
+  syncActiveFilter(oldName, next);
   notifyStreamChanged();
 }
 
@@ -194,6 +224,7 @@ async function submitDelete(name: string) {
   }
   if (!(await tagRequest(name, { method: "DELETE" }))) return;
   closePicker();
+  syncActiveFilter(name, null);
   notifyStreamChanged();
 }
 
@@ -211,6 +242,7 @@ async function refetchTags(): Promise<void> {
     totalIdeas.value = data.totalIdeas;
     untaggedCount.value = data.untaggedCount;
     voiceCount.value = data.voiceCount;
+    closePickerIfGone();
   } catch (err) {
     console.error("tags fetch failed", err);
   }
