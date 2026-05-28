@@ -74,11 +74,25 @@ function resolveAuthResponse(
 }
 
 // Local-only escape hatch for exercising the app without a passkey ceremony.
-// Opt-in via DRIFTNOTE_AUTH_BYPASS=1; never set in a real deployment. Resolves a
-// real user row (FKs on ideas/tags require one) — DRIFTNOTE_AUTH_BYPASS_EMAIL
-// picks which, else the first user. Returns null if the table is empty so the
-// normal unauth redirect still fires.
-const AUTH_BYPASS = process.env.DRIFTNOTE_AUTH_BYPASS === "1";
+// Opt-in via DRIFTNOTE_AUTH_BYPASS=1, AND only when BETTER_AUTH_URL points at
+// localhost. A real deployment must set BETTER_AUTH_URL to its public domain
+// (the passkey rpID derives from it), so even if the flag leaks into prod env it
+// can't disable auth there. Resolves a real user row (FKs on ideas/tags require
+// one) — DRIFTNOTE_AUTH_BYPASS_EMAIL picks which, else the first user. Returns
+// null if the table is empty so the normal unauth redirect still fires.
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+function isLocalhostUrl(raw: string | undefined): boolean {
+  try {
+    return LOCAL_HOSTS.has(new URL(raw ?? "http://localhost:4321").hostname);
+  } catch {
+    return false;
+  }
+}
+
+const AUTH_BYPASS =
+  process.env.DRIFTNOTE_AUTH_BYPASS === "1" &&
+  isLocalhostUrl(process.env.BETTER_AUTH_URL);
 
 function bypassUser(): App.Locals["user"] {
   const email = process.env.DRIFTNOTE_AUTH_BYPASS_EMAIL;
