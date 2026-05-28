@@ -8,7 +8,6 @@ export type PasskeySummary = {
   id: string;
   name: string | null;
   deviceType: string;
-  backedUp: boolean;
   createdAt: number | null;
 };
 
@@ -25,7 +24,6 @@ export async function listPasskeys(userId: string): Promise<PasskeySummary[]> {
       id: passkey.id,
       name: passkey.name,
       deviceType: passkey.deviceType,
-      backedUp: passkey.backedUp,
       createdAt: passkey.createdAt,
     })
     .from(passkey)
@@ -35,7 +33,6 @@ export async function listPasskeys(userId: string): Promise<PasskeySummary[]> {
     id: r.id,
     name: r.name,
     deviceType: r.deviceType,
-    backedUp: r.backedUp,
     createdAt: r.createdAt ? r.createdAt.getTime() : null,
   }));
 }
