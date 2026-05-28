@@ -2172,6 +2172,206 @@ body[data-theme="dark"] .theme-toggle .knob {
   color: var(--ink);
 }
 
+/* Profile name editing */
+.account-edit {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+.account-edit:hover {
+  color: var(--accent);
+}
+.account-edit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.account-edit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.account-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--rule-strong);
+  border-radius: 0;
+  padding: 6px 0 8px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  background: transparent;
+  color: var(--ink);
+  transition: border-color 120ms ease;
+  letter-spacing: -0.012em;
+}
+.account-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Device / session rows */
+.account-device {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 4px;
+  border-top: 1px solid var(--rule);
+}
+.account-device:first-of-type {
+  border-top: none;
+}
+.account-mark-static {
+  background: var(--ink-4);
+}
+.account-mark-live {
+  background: var(--accent);
+}
+.account-device-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.account-device-name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-device-meta {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.account-remove {
+  flex-shrink: 0;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink-3);
+  border-radius: var(--radius);
+  padding: 5px 11px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease;
+}
+.account-remove:hover:not(:disabled) {
+  color: var(--hot);
+  border-color: var(--hot);
+}
+.account-remove:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.account-badge {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  padding: 4px 8px;
+}
+.account-empty,
+.account-note {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.account-empty {
+  padding: 12px 4px;
+}
+.account-note {
+  margin: 8px 0 0;
+  padding-left: 24px;
+  color: var(--ink-4);
+}
+
+/* Departures / danger zone */
+.account-danger {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 4px 4px;
+  border-top: 1px solid var(--rule);
+}
+.account-danger-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.account-danger-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  letter-spacing: -0.012em;
+  text-transform: lowercase;
+  color: var(--ink-2);
+}
+.account-danger-sub {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.account-danger-btn:hover {
+  color: var(--hot);
+  border-color: var(--hot);
+  background: transparent;
+}
+.account-danger-confirm-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.account-danger-input {
+  width: auto;
+  flex: 1;
+  min-width: 120px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 6px 0;
+}
+.account-danger-go {
+  color: var(--surface);
+  background: var(--hot);
+  border-color: var(--hot);
+}
+.account-danger-go:hover:not(:disabled) {
+  background: var(--hot);
+  border-color: var(--hot);
+  opacity: 0.9;
+}
+.account-danger-go:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ---------- Reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
   *,

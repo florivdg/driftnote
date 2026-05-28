@@ -162,6 +162,29 @@ export async function parseTagPatchBody(
   return buildPatch(hue.value, name.value);
 }
 
+function validateDisplayName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const name = value.trim();
+  if (name.length === 0 || name.length > 200) return null;
+  return name;
+}
+
+export async function parseAccountPatchBody(
+  req: Request,
+): Promise<ParsedOr<{ name: string }>> {
+  const parsed = await readJson(req);
+  if (!parsed.ok) return parsed;
+  const p = parsed.value as { name?: unknown };
+  const name = validateDisplayName(p.name);
+  if (name === null) {
+    return {
+      ok: false,
+      res: new Response("name must be 1-200 chars", { status: 400 }),
+    };
+  }
+  return { ok: true, value: { name } };
+}
+
 export function parseSourceParam(
   v: string | null,
 ): "text" | "voice" | undefined {
