@@ -1,4 +1,4 @@
-export function isTypingInInput(el: Element | null): boolean {
+function isTypingInInput(el: Element | null): boolean {
   if (!el) return false;
   return el.tagName === "TEXTAREA" || el.tagName === "INPUT";
 }
@@ -15,12 +15,4 @@ export function isPlainHotkey(e: KeyboardEvent, key: string): boolean {
 
 export function isSaveHotkey(e: KeyboardEvent): boolean {
   return (e.metaKey || e.ctrlKey) && e.key === "Enter";
-}
-
-function hasMouseModifier(e: MouseEvent): boolean {
-  return e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
-}
-
-export function isPlainLeftClick(e: MouseEvent): boolean {
-  return !hasMouseModifier(e) && e.button === 0;
 }

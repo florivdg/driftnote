@@ -13,7 +13,7 @@ import { toggleTag } from "@/lib/url";
 import { parseIdeaBody } from "@/lib/idea-body";
 import { extractTags } from "@/lib/tags";
 import { interceptNav, notifyStreamChanged } from "@/lib/url-state";
-import { isSaveHotkey } from "@/lib/dom";
+import { isSaveHotkey } from "@/lib/keyboard";
 import {
   anchorBelow,
   attachDismiss,
