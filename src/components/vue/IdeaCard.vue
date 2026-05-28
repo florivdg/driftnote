@@ -120,7 +120,10 @@ async function sendPatch(text: string): Promise<void> {
 }
 
 async function sendDelete(): Promise<void> {
-  const res = await fetch(`/api/ideas/${props.idea.id}`, { method: "DELETE" });
+  const res = await fetch(`/api/ideas/${props.idea.id}`, {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+  });
   if (!res.ok) throw new Error(`delete failed: ${res.status}`);
 }
 
@@ -219,9 +222,8 @@ onBeforeUnmount(() => {
             <circle cx="12" cy="19" r="1.6" />
           </svg>
         </button>
-        <Teleport to="body">
+        <Teleport v-if="menuOpen" to="body">
           <div
-            v-if="menuOpen"
             ref="menuRef"
             class="entry-menu-pop"
             role="menu"

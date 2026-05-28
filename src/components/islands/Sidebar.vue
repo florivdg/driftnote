@@ -225,7 +225,13 @@ async function submitDelete(name: string) {
     confirmingDelete.value = true;
     return;
   }
-  if (!(await tagRequest(name, { method: "DELETE" }))) return;
+  if (
+    !(await tagRequest(name, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+    }))
+  )
+    return;
   closePicker();
   syncActiveFilter(name, null);
   notifyStreamChanged();

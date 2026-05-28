@@ -38,7 +38,7 @@ export async function updateDisplayName(name: string): Promise<string> {
 export async function removePasskey(id: string): Promise<void> {
   await requestOrThrow(
     `/api/account/passkeys/${encodeURIComponent(id)}`,
-    { method: "DELETE" },
+    { method: "DELETE", headers: { "content-type": "application/json" } },
     "could not remove passkey",
   );
 }
@@ -46,7 +46,7 @@ export async function removePasskey(id: string): Promise<void> {
 export async function revokeSession(id: string): Promise<void> {
   await requestOrThrow(
     `/api/account/sessions/${encodeURIComponent(id)}`,
-    { method: "DELETE" },
+    { method: "DELETE", headers: { "content-type": "application/json" } },
     "could not revoke session",
   );
 }
@@ -54,7 +54,7 @@ export async function revokeSession(id: string): Promise<void> {
 export async function revokeOtherSessions(): Promise<void> {
   await requestOrThrow(
     "/api/account/sessions",
-    { method: "DELETE" },
+    { method: "DELETE", headers: { "content-type": "application/json" } },
     "could not revoke other sessions",
   );
 }
