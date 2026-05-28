@@ -23,6 +23,16 @@ export default defineConfig({
   // /api/auth/* and /api/mcp/* exempted.
   security: {
     checkOrigin: false,
+    // Behind a reverse proxy the Node adapter otherwise computes ctx.url.origin
+    // as https://localhost:3000 — Astro 6 ignores Host / X-Forwarded-Host unless
+    // a host is allow-listed here — which made src/middleware.ts's CSRF check
+    // (origin !== ctx.url.origin) 403 every same-origin mutation. `[{}]` trusts
+    // the proxy's X-Forwarded-Host/Proto (and the preserved Host header) so the
+    // real origin is rebuilt for ANY domain an operator deploys behind their
+    // proxy. SECURITY: the operator's proxy MUST overwrite/strip client-supplied
+    // X-Forwarded-* (Traefik's default) and the container port must not be
+    // exposed bypassing it.
+    allowedDomains: [{}],
     csp: {
       algorithm: "SHA-256",
       directives: [
