@@ -1,8 +1,12 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import Masthead from "@/components/Masthead.astro";
-import AccountActions from "@/components/islands/AccountActions.vue";
+import ProfileForm from "@/components/islands/ProfileForm.vue";
+import PasskeyList from "@/components/islands/PasskeyList.vue";
+import SessionList from "@/components/islands/SessionList.vue";
+import DangerZone from "@/components/islands/DangerZone.vue";
 import { countIdeas, listTagsWithCounts } from "@/lib/ideas";
+import { listPasskeys, listSessions } from "@/lib/account";
 import { issueNumber } from "@/lib/issueNumber";
 
 export const prerender = false;
@@ -12,14 +16,18 @@ if (!user) {
   return Astro.redirect("/login?next=/account");
 }
 
-const [totalIdeas, tagList] = await Promise.all([
+const [totalIdeas, tagList, passkeys, sessions] = await Promise.all([
   countIdeas(user.id),
   listTagsWithCounts(user.id),
+  listPasskeys(user.id),
+  listSessions(user.id),
 ]);
 const visibleTagCount = tagList.filter((t) => t.count > 0).length;
+const currentSessionId = Astro.locals.session?.id ?? null;
 
 const issueNo = String(issueNumber()).padStart(3, "0");
 const firstName = (user.name ?? user.email ?? "you").split(/\s+/)[0];
+const pad = (n: number) => String(n).padStart(2, "0");
 ---
 
 <Layout title="DriftNote · Account">
@@ -44,7 +52,7 @@ const firstName = (user.name ?? user.email ?? "you").split(/\s+/)[0];
             On the masthead, <em>{firstName}</em>.
           </h1>
           <p class="issue-sub">
-            Your stream's bylines. Add another device, or step out for now.
+            Your bylines, your devices, your sessions — and the door out.
           </p>
         </section>
 
@@ -53,30 +61,39 @@ const firstName = (user.name ?? user.email ?? "you").split(/\s+/)[0];
             <span>Bylines</span>
             <span class="account-section-count">02</span>
           </div>
-          <article class="account-entry">
-            <div class="account-entry-top">
-              <span class="account-entry-num">№01</span>
-              <span class="account-entry-stamp">name</span>
-            </div>
-            <div class="account-entry-body">{user.name ?? "—"}</div>
-          </article>
-          <article class="account-entry">
-            <div class="account-entry-top">
-              <span class="account-entry-num">№02</span>
-              <span class="account-entry-stamp">correspondence</span>
-            </div>
-            <div class="account-entry-body account-entry-mono">
-              {user.email ?? "—"}
-            </div>
-          </article>
+          <ProfileForm
+            client:load
+            initialName={user.name ?? null}
+            email={user.email ?? null}
+          />
         </section>
 
         <section class="account-section">
           <div class="account-section-label">
             <span>Devices</span>
+            <span class="account-section-count">{pad(passkeys.length)}</span>
+          </div>
+          <PasskeyList client:load initial={passkeys} />
+        </section>
+
+        <section class="account-section">
+          <div class="account-section-label">
+            <span>Sessions</span>
+            <span class="account-section-count">{pad(sessions.length)}</span>
+          </div>
+          <SessionList
+            client:load
+            initial={sessions}
+            currentId={currentSessionId}
+          />
+        </section>
+
+        <section class="account-section">
+          <div class="account-section-label">
+            <span>Departures</span>
             <span class="account-section-count">·</span>
           </div>
-          <AccountActions client:load />
+          <DangerZone client:load />
         </section>
 
         <div class="stream-end">

@@ -3,7 +3,7 @@
 // server (Bun → en-US) and the browser (the user's locale) and produces Vue
 // hydration mismatches. Pin a fixed locale so both sides render identically;
 // en-US matches the rest of the UI, which is hard-coded English.
-const LOCALE = "en-US";
+export const LOCALE = "en-US";
 
 export const WEEKDAYS_SHORT = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 export const MONTHS_SHORT = [

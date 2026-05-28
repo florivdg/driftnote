@@ -78,3 +78,30 @@ export function gateWrite<T extends { id: string }>(
 ): Gate<T> {
   return gate(writeBucket, user, route);
 }
+
+type WriteHandler = (userId: string) => Promise<Response>;
+type IdWriteHandler = (userId: string, id: string) => Promise<Response>;
+
+// Auth (401) + write rate-limit (429), then dispatch to the handler. Keeps the
+// per-route boilerplate to a single call so the handlers stay thin.
+export function guardWrite(
+  user: { id: string } | null,
+  route: string,
+  handler: WriteHandler,
+): Promise<Response> | Response {
+  const gate = gateWrite(user, route);
+  if (!gate.ok) return gate.res;
+  return handler(gate.user.id);
+}
+
+export function guardIdWrite(
+  user: { id: string } | null,
+  id: string | undefined,
+  route: string,
+  handler: IdWriteHandler,
+): Promise<Response> | Response {
+  const gate = gateWrite(user, route);
+  if (!gate.ok) return gate.res;
+  if (!id) return new Response("Not found", { status: 404 });
+  return handler(gate.user.id, id);
+}

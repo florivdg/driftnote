@@ -101,6 +101,10 @@ export const auth = betterAuth({
   trustedOrigins,
   emailAndPassword: { enabled: false },
   socialProviders: {},
+  // No password and no email infra: deleteUser falls back to a fresh-session
+  // check (session.freshAge, default 24h). A stale session is rejected and the
+  // account page surfaces that error; recovery is sign-out → passkey sign-in.
+  user: { deleteUser: { enabled: true } },
   plugins: [
     passkey({
       rpID,
