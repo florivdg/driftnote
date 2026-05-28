@@ -26,8 +26,13 @@ export function isValidHue(n: number): n is Hue {
   return (HUE_CHOICES as readonly number[]).includes(n);
 }
 
-// A tag name on its own (no leading #), matching the hashtag grammar below.
-const TAG_NAME_RE = /^[a-z][a-z0-9_-]*$/;
+// The hashtag grammar, defined once so every regex below derives from it and
+// can't drift. TAG_TAIL is the continuation class; TAG_BODY is a full tag name.
+const TAG_TAIL = "[a-z0-9_-]";
+const TAG_BODY = `[a-z]${TAG_TAIL}*`;
+
+// A tag name on its own (no leading #), matching the hashtag grammar.
+const TAG_NAME_RE = new RegExp(`^${TAG_BODY}$`);
 
 export function normalizeTagName(raw: string): string {
   return raw.trim().toLowerCase();
@@ -38,7 +43,7 @@ export function isValidTagName(name: string): boolean {
 }
 
 // Hashtag regex MUST match the sketch verbatim so seeded vs composed parse identically.
-const TAG_RE = /#([a-z][a-z0-9_-]*)/gi;
+const TAG_RE = new RegExp(`#(${TAG_BODY})`, "gi");
 
 export function extractTags(text: string): string[] {
   const out: string[] = [];
@@ -47,6 +52,31 @@ export function extractTags(text: string): string[] {
     if (!out.includes(t)) out.push(t);
   }
   return out;
+}
+
+// A regex matching a complete #name hashtag token (case-insensitive), stopping
+// it from matching a prefix of a longer tag (#side vs #sidebar). Callers pass
+// validated tag names ([a-z][a-z0-9_-]*), so no regex-escaping is needed.
+function hashtagTokenRe(name: string): RegExp {
+  return new RegExp(`#${name}(?!${TAG_TAIL})`, "gi");
+}
+
+// Build a body rewriter that renames every #oldName token to #newName. The regex
+// is compiled once and reused across bodies (String#replace resets lastIndex).
+export function hashtagRenamer(
+  oldName: string,
+  newName: string,
+): (body: string) => string {
+  const re = hashtagTokenRe(oldName);
+  return (body) => body.replace(re, `#${newName}`);
+}
+
+// Build a body rewriter that drops the leading # of every #name token, leaving
+// the bare word as plain text. The matched text is kept verbatim (only the #
+// is removed) so a mixed-case #Gift stays "Gift" in prose, not "gift".
+export function hashtagStripper(name: string): (body: string) => string {
+  const re = hashtagTokenRe(name);
+  return (body) => body.replace(re, (match) => match.slice(1));
 }
 
 // Deterministic hue for unknown tags. Palette names short-circuit.

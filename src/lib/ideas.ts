@@ -10,7 +10,12 @@ import {
 } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { ideas, tags, ideaTags } from "@/lib/db/schema";
-import { defaultHueFor, extractTags } from "@/lib/tags";
+import {
+  defaultHueFor,
+  extractTags,
+  hashtagRenamer,
+  hashtagStripper,
+} from "@/lib/tags";
 
 export type IdeaWithTags = {
   id: string;
@@ -371,6 +376,30 @@ function findTag(tx: Tx, userId: string, name: string): TagRow | undefined {
   return rows[0];
 }
 
+// Rewrite the body of every idea linked to `tagId`, applying `transform`.
+// Driving FROM idea_tags filtered by tagId lets SQLite use idx_idea_tags_tag and
+// join ideas by primary key, so this touches only notes that use the tag — never
+// a full ideas scan. Runs inside the caller's transaction (single commit); skips
+// no-op rows and leaves updatedAt untouched (a tag rename/delete is metadata).
+function rewriteBodiesForTag(
+  tx: Tx,
+  userId: string,
+  tagId: string,
+  transform: (body: string) => string,
+): void {
+  const rows = tx
+    .select({ id: ideas.id, body: ideas.body })
+    .from(ideaTags)
+    .innerJoin(ideas, eq(ideas.id, ideaTags.ideaId))
+    .where(and(eq(ideaTags.tagId, tagId), eq(ideas.userId, userId)))
+    .all();
+  for (const r of rows) {
+    const next = transform(r.body);
+    if (next === r.body) continue;
+    tx.update(ideas).set({ body: next }).where(eq(ideas.id, r.id)).run();
+  }
+}
+
 // Move every link off the source tag onto the target (deduping links the idea
 // already has), then drop the source row. The FK cascade clears its old links.
 function mergeTagLinks(tx: Tx, sourceId: string, targetId: string): void {
@@ -400,6 +429,13 @@ export async function renameOrMergeTag(
     if (!source) return null;
     if (newName === oldName) return { tag: source, merged: false };
 
+    rewriteBodiesForTag(
+      tx,
+      userId,
+      source.id,
+      hashtagRenamer(oldName, newName),
+    );
+
     const target = findTag(tx, userId, newName);
     if (target) {
       mergeTagLinks(tx, source.id, target.id);
@@ -416,14 +452,19 @@ export async function renameOrMergeTag(
   });
 }
 
-// Delete a tag; its idea_tags links go with it via ON DELETE cascade.
+// Delete a tag; its idea_tags links go with it via ON DELETE cascade. First
+// strip the #name token from every linked body (keeping the bare word) so the
+// tag can't silently re-create itself the next time a note is edited. Both steps
+// run in one synchronous transaction (see the note above renameOrMergeTag).
 export async function deleteTag(
   userId: string,
   name: string,
 ): Promise<boolean> {
-  const deleted = await db
-    .delete(tags)
-    .where(and(eq(tags.userId, userId), eq(tags.name, name)))
-    .returning();
-  return deleted.length > 0;
+  return db.transaction((tx) => {
+    const source = findTag(tx, userId, name);
+    if (!source) return false;
+    rewriteBodiesForTag(tx, userId, source.id, hashtagStripper(name));
+    tx.delete(tags).where(eq(tags.id, source.id)).run();
+    return true;
+  });
 }
