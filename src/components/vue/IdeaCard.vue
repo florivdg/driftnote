@@ -17,6 +17,7 @@ import { isSaveHotkey } from "@/lib/dom";
 import {
   anchorBelow,
   attachDismiss,
+  createDismissHandlers,
   detachDismiss,
   placePopover,
 } from "@/lib/popover";
@@ -53,7 +54,11 @@ const editRef = useTemplateRef<HTMLTextAreaElement>("editRef");
 
 const draftTags = computed(() => extractTags(draft.value));
 
-const dismiss = { onPointerDown: onDoc, onKeyDown: onKey };
+const dismiss = createDismissHandlers({
+  trigger: () => triggerRef.value,
+  surface: () => menuRef.value,
+  close: closeMenu,
+});
 
 function openMenu() {
   const pos = anchorBelow(triggerRef.value!, 8);
@@ -74,20 +79,6 @@ function closeMenu() {
 function toggleMenu() {
   if (menuOpen.value) closeMenu();
   else openMenu();
-}
-
-function onDoc(e: MouseEvent) {
-  const target = e.target as Node;
-  // Clicks on the trigger are handled by its own @click toggle; closing here
-  // first would race that click and immediately reopen the menu.
-  if (triggerRef.value?.contains(target)) return;
-  if (menuRef.value && !menuRef.value.contains(target)) closeMenu();
-}
-
-function onKey(e: KeyboardEvent) {
-  if (e.key !== "Escape") return;
-  closeMenu();
-  triggerRef.value?.focus();
 }
 
 function autosize() {

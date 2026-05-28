@@ -5,6 +5,7 @@ import { MONTHS_SHORT, WEEKDAYS_SHORT } from "@/lib/time";
 import {
   anchorBelow,
   attachDismiss,
+  createDismissHandlers,
   detachDismiss,
   placePopover,
 } from "@/lib/popover";
@@ -26,7 +27,11 @@ const sessionDate = `${WEEKDAYS_SHORT[now.getDay()]} · ${MONTHS_SHORT[now.getMo
 
 const displayName = computed(() => props.name?.trim() || props.email || "you");
 
-const dismiss = { onPointerDown: onDoc, onKeyDown: onKey };
+const dismiss = createDismissHandlers({
+  trigger: () => triggerRef.value,
+  surface: () => menuRef.value,
+  close: closeMenu,
+});
 
 function openMenu() {
   const pos = anchorBelow(triggerRef.value!, 10);
@@ -45,19 +50,6 @@ function closeMenu() {
 function toggleMenu() {
   if (open.value) closeMenu();
   else openMenu();
-}
-
-function onDoc(e: MouseEvent) {
-  if (menuRef.value && !menuRef.value.contains(e.target as Node)) {
-    closeMenu();
-  }
-}
-
-function onKey(e: KeyboardEvent) {
-  if (e.key === "Escape") {
-    closeMenu();
-    triggerRef.value?.focus();
-  }
 }
 
 async function handleSignOut() {
