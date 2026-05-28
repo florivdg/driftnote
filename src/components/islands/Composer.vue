@@ -7,9 +7,9 @@ import {
   useTemplateRef,
   watch,
 } from "vue";
-import { navigate } from "astro:transitions/client";
 import { extractTags } from "@/lib/tags";
 import { isPlainHotkey } from "@/lib/dom";
+import { notifyStreamChanged } from "@/lib/url-state";
 
 const props = defineProps<{
   suggested: string[];
@@ -107,11 +107,10 @@ async function submit() {
     await postIdea(body, sourceForNextSubmit.value);
     text.value = "";
     sourceForNextSubmit.value = "text";
-    await navigate(location.pathname + location.search, {
-      history: "replace",
-    });
+    notifyStreamChanged();
   } catch (err) {
     console.error(err);
+  } finally {
     submitting.value = false;
   }
 }
@@ -166,11 +165,7 @@ onBeforeUnmount(() => {
       </div>
       <div class="voice-panel">
         <div class="voice-wave">
-          <span
-            v-for="i in 32"
-            :key="i"
-            :style="{ animationDelay: `${((i - 1) % 8) * 0.08}s` }"
-          ></span>
+          <span v-for="i in 32" :key="i"></span>
         </div>
         <span class="voice-time">{{ mmss }}</span>
         <button class="btn" @click="stopRecording" type="button">
@@ -204,18 +199,7 @@ onBeforeUnmount(() => {
       "
       class="composer-tags"
     >
-      <span
-        style="
-          font-family: var(--font-mono);
-          font-size: 10px;
-          color: var(--ink-3);
-          text-transform: uppercase;
-          letter-spacing: 0.08em;
-          align-self: center;
-        "
-      >
-        Add →
-      </span>
+      <span class="composer-add-label">Add →</span>
       <button
         v-for="t in suggested.slice(0, 4)"
         :key="t"

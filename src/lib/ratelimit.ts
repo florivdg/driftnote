@@ -1,6 +1,8 @@
 // Fixed-window rate limiter keyed by an arbitrary string (usually a userId).
 // In-process Map — fine for single-process Bun. Each Bucket is independent.
 
+import { audit } from "@/lib/audit";
+
 export type Bucket = {
   windowMs: number;
   max: number;
@@ -46,4 +48,18 @@ export function rateLimitedResponse(retryAfter: number): Response {
     status: 429,
     headers: { "retry-after": String(retryAfter) },
   });
+}
+
+export type Gate<T> = { ok: true; user: T } | { ok: false; res: Response };
+
+export function gateRead<T extends { id: string }>(
+  user: T | null,
+  route: string,
+): Gate<T> {
+  if (!user)
+    return { ok: false, res: new Response("Unauthorized", { status: 401 }) };
+  const gate = checkRate(readBucket, user.id);
+  if (gate.ok) return { ok: true, user };
+  audit("rate_limited", { userId: user.id, route });
+  return { ok: false, res: rateLimitedResponse(gate.retryAfter) };
 }

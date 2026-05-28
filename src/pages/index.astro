@@ -1,10 +1,8 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import Masthead from "@/components/Masthead.astro";
-import Sidebar from "@/components/Sidebar.astro";
-import IdeaCard from "@/components/IdeaCard.astro";
-import DayGroup from "@/components/DayGroup.astro";
-import FilterStrip from "@/components/FilterStrip.astro";
+import Sidebar from "@/components/islands/Sidebar.vue";
+import StreamView from "@/components/islands/StreamView.vue";
 import Composer from "@/components/islands/Composer.vue";
 import {
   listIdeas,
@@ -16,7 +14,6 @@ import {
 } from "@/lib/ideas";
 import { issueNumber } from "@/lib/issueNumber";
 import { parseTags } from "@/lib/url";
-import { groupByDay } from "@/lib/time";
 import { parseSourceParam } from "@/lib/validation";
 
 export const prerender = false;
@@ -49,17 +46,16 @@ const [ideas, tagList, totalIdeas, untaggedCount, voiceCount] =
     countVoice(user.id),
   ]);
 
-const groups = groupByDay(ideas);
-
 const visibleTagCount = tagList.filter((t) => t.count > 0).length;
-const activeTagsWithHue = activeTagNames.map((name) => {
-  const found = tagList.find((t) => t.name === name);
-  return { name, hue: found?.hue };
-});
 const suggestedTags = tagList
   .filter((t) => t.count > 0)
   .slice(0, 4)
   .map((t) => t.name);
+
+const tagHueByName = new Map(tagList.map((t) => [t.name, t.hue]));
+const activeTagHues = activeTagNames
+  .map((name) => ({ name, hue: tagHueByName.get(name) }))
+  .filter((t): t is { name: string; hue: number } => t.hue !== undefined);
 
 const MO = [
   "January",
@@ -78,6 +74,26 @@ const MO = [
 const now = new Date();
 const weekOf = `${MO[now.getMonth()]} ${now.getDate()}`;
 const issueNo = String(issueNumber()).padStart(3, "0");
+
+const sidebarInitial = {
+  tagList,
+  totalIdeas,
+  untaggedCount,
+  voiceCount,
+  query: q,
+  tags: activeTagNames,
+  untagged,
+  source,
+};
+
+const streamInitial = {
+  ideas,
+  activeTagHues,
+  query: q,
+  tags: activeTagNames,
+  untagged,
+  source,
+};
 ---
 
 <Layout title="DriftNote">
@@ -88,17 +104,7 @@ const issueNo = String(issueNumber()).padStart(3, "0");
       tagCount={visibleTagCount}
       query={q}
     />
-    <Sidebar
-      url={Astro.url}
-      tagList={tagList}
-      activeTags={activeTagNames}
-      totalIdeas={totalIdeas}
-      untaggedCount={untaggedCount}
-      voiceCount={voiceCount}
-      untagged={untagged}
-      source={source}
-      query={q}
-    />
+    <Sidebar client:load initial={sidebarInitial} />
     <main id="main" class="stream-wrap" tabindex="-1">
       <div class="stream-inner">
         <section class="issue">
@@ -118,32 +124,7 @@ const issueNo = String(issueNumber()).padStart(3, "0");
 
         <Composer client:load suggested={suggestedTags} />
 
-        <FilterStrip
-          url={Astro.url}
-          activeTags={activeTagsWithHue}
-          query={q}
-          untagged={untagged}
-          source={source}
-        />
-
-        {
-          ideas.length === 0 ? (
-            <div class="stream-empty">
-              <h2>Nothing here.</h2>
-              <p>Loosen a filter, or jot down what's on your mind.</p>
-            </div>
-          ) : (
-            groups.map((g) => (
-              <DayGroup label={g.label} count={g.items.length}>
-                {g.items.map((idea, idx) => (
-                  <IdeaCard idea={idea} index={idx} url={Astro.url} />
-                ))}
-              </DayGroup>
-            ))
-          )
-        }
-
-        <div class="stream-end">End of stream</div>
+        <StreamView client:load initial={streamInitial} />
       </div>
     </main>
   </div>

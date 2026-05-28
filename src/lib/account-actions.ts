@@ -1,10 +1,9 @@
-import { navigate } from "astro:transitions/client";
 import { authClient, unwrapAuthResult } from "./auth-client";
 
 export async function signOutAndRedirect(): Promise<void> {
   const res = await authClient.signOut();
   unwrapAuthResult(res, "sign-out failed");
-  await navigate("/login", { history: "push" });
+  location.assign("/login");
 }
 
 export async function addPasskeyToAccount(name: string): Promise<void> {

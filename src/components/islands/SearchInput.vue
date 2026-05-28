@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
-import { navigate } from "astro:transitions/client";
 import { isPlainHotkey } from "@/lib/dom";
 import { setQuery } from "@/lib/url";
+import { applyURL, subscribeFilters } from "@/lib/url-state";
 
 // Debounced search island. Owns the masthead search input.
 //
-// On input change, debounce 250ms, then hand off to Astro's view-transition
-// router via navigate(). The island is mounted with `transition:persist` in
-// Masthead.astro, so the DOM element and this Vue instance survive the swap —
-// focus and caret stay where the user left them while typing.
+// On input change, debounce 250ms, then pushState the new URL via applyURL().
+// StreamView listens for the `urlchange` event and refetches /api/stream — the
+// input element itself never unmounts, so focus and caret stay where the user
+// left them while typing.
 
 const props = defineProps<{
   initial: string;
@@ -19,9 +19,7 @@ const value = ref(props.initial);
 let timer: ReturnType<typeof setTimeout> | null = null;
 
 function commit() {
-  const next = setQuery(new URL(location.href), value.value.trim());
-  if (next === `${location.pathname}${location.search}`) return;
-  navigate(next, { history: "push" });
+  applyURL(setQuery(new URL(location.href), value.value.trim()));
 }
 
 function onInput() {
@@ -45,13 +43,21 @@ function focusOnSlash(e: KeyboardEvent) {
   el?.select();
 }
 
+let unsubscribe: (() => void) | null = null;
+
 onMounted(() => {
   window.addEventListener("keydown", focusOnSlash);
+  // Re-sync the input when the URL changes from elsewhere
+  // (e.g. clearing the search chip in FilterStrip, browser back/forward).
+  unsubscribe = subscribeFilters((f) => {
+    if (f.q !== value.value) value.value = f.q;
+  });
 });
 
 onBeforeUnmount(() => {
   if (timer) clearTimeout(timer);
   window.removeEventListener("keydown", focusOnSlash);
+  unsubscribe?.();
 });
 </script>
 

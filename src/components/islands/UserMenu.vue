@@ -10,7 +10,6 @@ const props = defineProps<{
 }>();
 
 const open = ref(false);
-const menuPos = ref({ top: 0, right: 0 });
 const signingOut = ref(false);
 const error = ref<string | null>(null);
 const triggerRef = useTemplateRef<HTMLButtonElement>("triggerRef");
@@ -23,17 +22,20 @@ const displayName = computed(() => props.name?.trim() || props.email || "you");
 
 function openMenu() {
   const r = triggerRef.value!.getBoundingClientRect();
-  menuPos.value = {
-    top: r.bottom + 10,
-    right: Math.max(12, window.innerWidth - r.right),
-  };
+  const top = r.bottom + 10;
+  const right = Math.max(12, window.innerWidth - r.right);
   open.value = true;
   setTimeout(() => {
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
   }, 0);
   void nextTick().then(() => {
-    menuRef.value?.querySelector<HTMLElement>("a, button")?.focus();
+    const menu = menuRef.value;
+    if (menu) {
+      menu.style.setProperty("--popover-top", `${top}px`);
+      menu.style.setProperty("--popover-right", `${right}px`);
+      menu.querySelector<HTMLElement>("a, button")?.focus();
+    }
   });
 }
 
@@ -93,13 +95,7 @@ onBeforeUnmount(() => {
     >
       {{ initials }}
     </button>
-    <div
-      v-if="open"
-      ref="menuRef"
-      class="user-menu"
-      :style="{ top: menuPos.top + 'px', right: menuPos.right + 'px' }"
-      aria-label="Account menu"
-    >
+    <div v-if="open" ref="menuRef" class="user-menu" aria-label="Account menu">
       <div class="user-menu-line">
         <span>session</span>
         <span class="sep">·</span>
