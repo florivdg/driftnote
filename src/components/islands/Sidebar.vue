@@ -55,6 +55,9 @@ const visible = computed(() =>
 );
 function toggleUnused() {
   showUnused.value = !showUnused.value;
+  // Hiding unused tags can unmount an open editor; close it so its listeners
+  // don't leak (closePickerIfGone reads the freshly recomputed `visible`).
+  closePickerIfGone();
 }
 const activeTagSet = computed(() => new Set(filters.value.tags));
 const everythingActive = computed(
