@@ -600,6 +600,99 @@ body[data-theme="dark"] .theme-toggle .knob {
     0 0 0 3px var(--ink);
 }
 
+/* ---------- Tag editor: rename + delete ---------- */
+.cp-rename {
+  display: flex;
+  gap: 6px;
+  margin-top: 12px;
+}
+.cp-rename-input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+.cp-rename-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.cp-rename-btn,
+.cp-delete {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+.cp-rename-btn {
+  color: var(--ink-2);
+  background: var(--surface-3);
+  border: 1px solid var(--rule-strong);
+}
+.cp-rename-btn:hover:not(:disabled) {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+.cp-actions {
+  margin-top: 8px;
+}
+.cp-delete {
+  width: 100%;
+  color: var(--ink-3);
+  background: transparent;
+  border: 1px solid var(--rule);
+}
+.cp-delete:hover:not(:disabled) {
+  color: var(--hot);
+  border-color: var(--hot);
+}
+.cp-delete.confirming {
+  color: var(--surface);
+  background: var(--hot);
+  border-color: var(--hot);
+}
+.cp-rename-btn:disabled,
+.cp-delete:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.cp-error {
+  margin: 8px 2px 0;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--hot);
+}
+.tag-unused-toggle {
+  margin-left: auto;
+  margin-right: 8px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.tag-unused-toggle:hover {
+  color: var(--accent);
+}
+.side-item-wrap.is-unused .side-item {
+  opacity: 0.55;
+}
+.side-item-wrap.is-unused .side-item:hover {
+  opacity: 1;
+}
+
 .side-item.active .num {
   color: var(--ink-3);
 }

@@ -12,6 +12,7 @@ import type { TagListEntry } from "@/lib/ideas";
 import type { TagsResponse } from "@/lib/api-types";
 import { setFlag, toggleTag } from "@/lib/url";
 import {
+  applyURL,
   filtersToSearch,
   interceptNav,
   notifyStreamChanged,
@@ -19,7 +20,7 @@ import {
   subscribeStreamChanged,
   type Filters,
 } from "@/lib/url-state";
-import { HUE_CHOICES } from "@/lib/tags";
+import { HUE_CHOICES, normalizeTagName } from "@/lib/tags";
 import { createAbortableFetcher, fetchJSON } from "@/lib/fetcher";
 
 const props = defineProps<{
@@ -46,7 +47,18 @@ const filters = shallowRef<Filters>({
   source: props.initial.source,
 });
 
-const visible = computed(() => tagList.value.filter((t) => t.count > 0));
+const showUnused = ref(false);
+const tagged = computed(() => tagList.value.filter((t) => t.count > 0));
+const unused = computed(() => tagList.value.filter((t) => t.count === 0));
+const visible = computed(() =>
+  showUnused.value ? tagList.value : tagged.value,
+);
+function toggleUnused() {
+  showUnused.value = !showUnused.value;
+  // Hiding unused tags can unmount an open editor; close it so its listeners
+  // don't leak (closePickerIfGone reads the freshly recomputed `visible`).
+  closePickerIfGone();
+}
 const activeTagSet = computed(() => new Set(filters.value.tags));
 const everythingActive = computed(
   () =>
@@ -74,8 +86,18 @@ function tagHref(name: string): string {
 
 const pickerOpenFor = ref<string | null>(null);
 const saving = ref(false);
+const editName = ref("");
+const confirmingDelete = ref(false);
+const errorMsg = ref<string | null>(null);
 const pickerRef = useTemplateRef<HTMLDivElement>("pickerRef");
 let activeDot: HTMLElement | null = null;
+
+// The ref is bound inside v-for, so Vue resolves it to an array; only one
+// popover is ever open, so unwrap to that single element.
+function pickerEl(): HTMLElement | null {
+  const v = pickerRef.value as HTMLElement | HTMLElement[] | null;
+  return Array.isArray(v) ? (v[0] ?? null) : v;
+}
 
 function openPicker(e: MouseEvent, name: string) {
   e.preventDefault();
@@ -83,29 +105,39 @@ function openPicker(e: MouseEvent, name: string) {
   const dot = e.currentTarget as HTMLElement;
   const r = dot.getBoundingClientRect();
   pickerOpenFor.value = name;
+  editName.value = name;
+  confirmingDelete.value = false;
+  errorMsg.value = null;
   activeDot = dot;
   setTimeout(() => {
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
   }, 0);
   void nextTick().then(() => {
-    const picker = pickerRef.value;
-    if (picker) {
-      picker.style.setProperty("--popover-top", `${r.top + r.height / 2}px`);
-      picker.style.setProperty("--popover-left", `${r.right + 8}px`);
-      picker.querySelector<HTMLElement>("button")?.focus();
-    }
+    const picker = pickerEl();
+    if (!picker) return;
+    // Clamp the vertically-centered popover so a tall editor near the top or
+    // bottom edge stays fully on-screen.
+    const half = picker.offsetHeight / 2;
+    const center = r.top + r.height / 2;
+    const top = Math.min(Math.max(center, half + 8), innerHeight - half - 8);
+    picker.style.setProperty("--popover-top", `${top}px`);
+    picker.style.setProperty("--popover-left", `${r.right + 8}px`);
+    picker.querySelector<HTMLElement>(".cp-rename-input")?.focus();
   });
 }
 
 function closePicker() {
   pickerOpenFor.value = null;
+  confirmingDelete.value = false;
+  errorMsg.value = null;
   document.removeEventListener("mousedown", onDoc);
   document.removeEventListener("keydown", onKey);
 }
 
 function onDoc(e: MouseEvent) {
-  if (pickerRef.value && !pickerRef.value.contains(e.target as Node)) {
+  const el = pickerEl();
+  if (el && !el.contains(e.target as Node)) {
     closePicker();
   }
 }
@@ -117,25 +149,86 @@ function onKey(e: KeyboardEvent) {
   activeDot = null;
 }
 
-async function pickHue(name: string, h: number) {
+async function tagRequest(name: string, init: RequestInit): Promise<boolean> {
   saving.value = true;
+  errorMsg.value = null;
   try {
-    const res = await fetch(`/api/tags/${encodeURIComponent(name)}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ hue: h }),
-    });
-    if (!res.ok) throw new Error("failed");
-    tagList.value = tagList.value.map((t) =>
-      t.name === name ? { ...t, hue: h } : t,
-    );
-    closePicker();
-    notifyStreamChanged();
-  } catch (err) {
-    console.error(err);
+    const res = await fetch(`/api/tags/${encodeURIComponent(name)}`, init);
+    if (!res.ok) {
+      errorMsg.value = (await res.text()) || "request failed";
+      return false;
+    }
+    return true;
+  } catch {
+    errorMsg.value = "network error";
+    return false;
   } finally {
     saving.value = false;
   }
+}
+
+function jsonPatch(body: unknown): RequestInit {
+  return {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  };
+}
+
+// Keep the URL's ?tags= filter in sync when the tag it points at is renamed
+// (newName) or deleted (null); otherwise the stream refetches against a tag
+// that no longer exists and goes empty with a dangling filter chip.
+function syncActiveFilter(oldName: string, newName: string | null) {
+  if (!filters.value.tags.includes(oldName)) return;
+  const nextTags = newName
+    ? [...new Set(filters.value.tags.map((t) => (t === oldName ? newName : t)))]
+    : filters.value.tags.filter((t) => t !== oldName);
+  applyURL(
+    `/${filtersToSearch({ ...filters.value, tags: nextTags })}`,
+    "replace",
+  );
+}
+
+// If the open editor's tag is no longer rendered (deleted, or dropped to count
+// 0 while unused are hidden), its popover unmounts; close it so the document
+// listeners don't leak.
+function closePickerIfGone(): void {
+  const open = pickerOpenFor.value;
+  if (open && !visible.value.some((t) => t.name === open)) closePicker();
+}
+
+async function pickHue(name: string, h: number) {
+  confirmingDelete.value = false;
+  if (!(await tagRequest(name, jsonPatch({ hue: h })))) return;
+  tagList.value = tagList.value.map((t) =>
+    t.name === name ? { ...t, hue: h } : t,
+  );
+  closePicker();
+  notifyStreamChanged();
+}
+
+async function submitRename(oldName: string) {
+  confirmingDelete.value = false;
+  const next = normalizeTagName(editName.value).replace(/^#+/, "");
+  if (!next || next === oldName) {
+    closePicker();
+    return;
+  }
+  if (!(await tagRequest(oldName, jsonPatch({ name: next })))) return;
+  closePicker();
+  syncActiveFilter(oldName, next);
+  notifyStreamChanged();
+}
+
+async function submitDelete(name: string) {
+  if (!confirmingDelete.value) {
+    confirmingDelete.value = true;
+    return;
+  }
+  if (!(await tagRequest(name, { method: "DELETE" }))) return;
+  closePicker();
+  syncActiveFilter(name, null);
+  notifyStreamChanged();
 }
 
 const fetcher = createAbortableFetcher();
@@ -152,6 +245,7 @@ async function refetchTags(): Promise<void> {
     totalIdeas.value = data.totalIdeas;
     untaggedCount.value = data.untaggedCount;
     voiceCount.value = data.voiceCount;
+    closePickerIfGone();
   } catch (err) {
     console.error("tags fetch failed", err);
   }
@@ -217,12 +311,25 @@ onBeforeUnmount(() => {
       <div class="side-section">
         <div class="side-label">
           <span>Tags</span>
-          <span class="count">{{ visible.length }}</span>
+          <button
+            v-if="unused.length > 0"
+            type="button"
+            class="tag-unused-toggle"
+            :aria-pressed="showUnused"
+            @click="toggleUnused"
+          >
+            {{ showUnused ? "hide unused" : `${unused.length} unused` }}
+          </button>
+          <span class="count">{{ tagged.length }}</span>
         </div>
         <div
           v-for="tg in visible"
           :key="tg.id"
-          :class="['side-item-wrap', activeTagSet.has(tg.name) && 'active']"
+          :class="[
+            'side-item-wrap',
+            activeTagSet.has(tg.name) && 'active',
+            tg.count === 0 && 'is-unused',
+          ]"
         >
           <a
             :class="[
@@ -242,8 +349,8 @@ onBeforeUnmount(() => {
           <button
             type="button"
             class="dot-button-overlay"
-            :aria-label="`Change color for #${tg.name}`"
-            title="Change color"
+            :aria-label="`Edit tag #${tg.name}`"
+            title="Edit tag"
             @click="openPicker($event, tg.name)"
           ></button>
           <div
@@ -251,11 +358,11 @@ onBeforeUnmount(() => {
             ref="pickerRef"
             class="color-picker"
             role="dialog"
-            :aria-label="`Color for #${tg.name}`"
+            :aria-label="`Edit tag #${tg.name}`"
           >
             <div class="color-picker-head">
               <span class="cp-tag">#{{ tg.name }}</span>
-              <span class="cp-hint">pick a color</span>
+              <span class="cp-hint">edit</span>
             </div>
             <div class="color-grid">
               <button
@@ -269,6 +376,32 @@ onBeforeUnmount(() => {
                 @click="pickHue(tg.name, h)"
               ></button>
             </div>
+            <form class="cp-rename" @submit.prevent="submitRename(tg.name)">
+              <input
+                v-model="editName"
+                class="cp-rename-input"
+                type="text"
+                :aria-label="`Rename #${tg.name}`"
+                :disabled="saving"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <button type="submit" class="cp-rename-btn" :disabled="saving">
+                rename
+              </button>
+            </form>
+            <div class="cp-actions">
+              <button
+                type="button"
+                class="cp-delete"
+                :class="{ confirming: confirmingDelete }"
+                :disabled="saving"
+                @click="submitDelete(tg.name)"
+              >
+                {{ confirmingDelete ? "confirm delete?" : "delete tag" }}
+              </button>
+            </div>
+            <p v-if="errorMsg" class="cp-error" role="alert">{{ errorMsg }}</p>
           </div>
         </div>
       </div>
