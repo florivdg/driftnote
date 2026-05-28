@@ -35,6 +35,102 @@ export type TagListEntry = {
   count: number;
 };
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type ResolvedTag = { name: string; id: string; hue: number };
+
+// All tag reconciliation runs inside db.transaction with a SYNCHRONOUS callback:
+// drizzle's bun-sqlite transaction wraps BEGIN/COMMIT synchronously, so an async
+// callback would commit before any awaited statement ran (no atomicity, no
+// rollback on a mid-sync failure). The helpers below therefore use the eager
+// .run()/.all() executors, never await.
+
+// Resolve each desired tag name to a row, creating any that don't exist yet.
+// One batch SELECT instead of N per-tag lookups; returns desired order.
+function resolveDesiredTags(
+  tx: Tx,
+  userId: string,
+  desired: string[],
+  now: number,
+): ResolvedTag[] {
+  const existing = new Map<string, { id: string; hue: number }>();
+  if (desired.length > 0) {
+    const rows = tx
+      .select({ id: tags.id, name: tags.name, hue: tags.hue })
+      .from(tags)
+      .where(and(eq(tags.userId, userId), inArray(tags.name, desired)))
+      .all();
+    rows.forEach((r) => existing.set(r.name, { id: r.id, hue: r.hue }));
+  }
+  const out: ResolvedTag[] = [];
+  for (const name of desired) {
+    const found = existing.get(name);
+    if (found) {
+      out.push({ name, id: found.id, hue: found.hue });
+      continue;
+    }
+    const id = Bun.randomUUIDv7();
+    const hue = defaultHueFor(name);
+    tx.insert(tags).values({ id, userId, name, hue, createdAt: now }).run();
+    out.push({ name, id, hue });
+  }
+  return out;
+}
+
+function currentLinkIds(tx: Tx, ideaId: string): Set<string> {
+  const rows = tx
+    .select({ tagId: ideaTags.tagId })
+    .from(ideaTags)
+    .where(eq(ideaTags.ideaId, ideaId))
+    .all();
+  return new Set(rows.map((r) => r.tagId));
+}
+
+function addLinks(
+  tx: Tx,
+  ideaId: string,
+  resolved: ResolvedTag[],
+  currentIds: Set<string>,
+): void {
+  for (const t of resolved) {
+    if (currentIds.has(t.id)) continue;
+    tx.insert(ideaTags)
+      .values({ ideaId, tagId: t.id })
+      .onConflictDoNothing()
+      .run();
+  }
+}
+
+function removeLinks(
+  tx: Tx,
+  ideaId: string,
+  currentIds: Set<string>,
+  desiredIds: Set<string>,
+): void {
+  const toRemove = [...currentIds].filter((id) => !desiredIds.has(id));
+  if (toRemove.length === 0) return;
+  tx.delete(ideaTags)
+    .where(and(eq(ideaTags.ideaId, ideaId), inArray(ideaTags.tagId, toRemove)))
+    .run();
+}
+
+// Make the idea's tag links exactly match `desired`: create missing tags,
+// add new links, drop stale ones. Orphaned tag rows are intentionally kept
+// (the sidebar hides count-0 tags and a tag's hue is preserved for reuse).
+function syncIdeaTags(
+  tx: Tx,
+  userId: string,
+  ideaId: string,
+  desired: string[],
+  now: number,
+): { name: string; hue: number }[] {
+  const resolved = resolveDesiredTags(tx, userId, desired, now);
+  const desiredIds = new Set(resolved.map((t) => t.id));
+  const currentIds = currentLinkIds(tx, ideaId);
+  addLinks(tx, ideaId, resolved, currentIds);
+  removeLinks(tx, ideaId, currentIds, desiredIds);
+  return resolved.map((t) => ({ name: t.name, hue: t.hue }));
+}
+
 export async function createIdeaWithTags(opts: {
   userId: string;
   body: string;
@@ -45,61 +141,67 @@ export async function createIdeaWithTags(opts: {
   const now = Date.now();
   const ideaId = Bun.randomUUIDv7();
 
-  const inserted: IdeaWithTags = await db.transaction(async (tx) => {
-    await tx.insert(ideas).values({
-      id: ideaId,
-      userId: opts.userId,
-      body: text,
-      source: opts.source,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    // One batch SELECT instead of N per-tag lookups.
-    const existingByName = new Map<string, { id: string; hue: number }>();
-    if (extracted.length > 0) {
-      const rows = await tx
-        .select({ id: tags.id, name: tags.name, hue: tags.hue })
-        .from(tags)
-        .where(
-          and(eq(tags.userId, opts.userId), inArray(tags.name, extracted)),
-        );
-      rows.forEach((r) => existingByName.set(r.name, { id: r.id, hue: r.hue }));
-    }
-
-    const linked: { name: string; hue: number }[] = [];
-    for (const name of extracted) {
-      const existing = existingByName.get(name);
-      let tagId: string;
-      let hue: number;
-      if (existing) {
-        tagId = existing.id;
-        hue = existing.hue;
-      } else {
-        tagId = Bun.randomUUIDv7();
-        hue = defaultHueFor(name);
-        await tx.insert(tags).values({
-          id: tagId,
-          userId: opts.userId,
-          name,
-          hue,
-          createdAt: now,
-        });
-      }
-      await tx.insert(ideaTags).values({ ideaId, tagId }).onConflictDoNothing();
-      linked.push({ name, hue });
-    }
-
+  return db.transaction((tx) => {
+    tx.insert(ideas)
+      .values({
+        id: ideaId,
+        userId: opts.userId,
+        body: text,
+        source: opts.source,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .run();
+    const tagList = syncIdeaTags(tx, opts.userId, ideaId, extracted, now);
     return {
       id: ideaId,
       body: text,
       source: opts.source,
       createdAt: now,
-      tags: linked,
+      tags: tagList,
     };
   });
+}
 
-  return inserted;
+export async function updateIdeaWithTags(opts: {
+  userId: string;
+  ideaId: string;
+  body: string;
+}): Promise<IdeaWithTags | null> {
+  const text = opts.body.trim();
+  const extracted = extractTags(text);
+  const now = Date.now();
+
+  return db.transaction((tx) => {
+    const updated = tx
+      .update(ideas)
+      .set({ body: text, updatedAt: now })
+      .where(and(eq(ideas.id, opts.ideaId), eq(ideas.userId, opts.userId)))
+      .returning({ source: ideas.source, createdAt: ideas.createdAt })
+      .all();
+    const row = updated[0];
+    if (!row) return null;
+    const tagList = syncIdeaTags(tx, opts.userId, opts.ideaId, extracted, now);
+    return {
+      id: opts.ideaId,
+      body: text,
+      source: row.source as "text" | "voice",
+      createdAt: row.createdAt,
+      tags: tagList,
+    };
+  });
+}
+
+export async function deleteIdea(
+  userId: string,
+  ideaId: string,
+): Promise<boolean> {
+  const deleted = db
+    .delete(ideas)
+    .where(and(eq(ideas.id, ideaId), eq(ideas.userId, userId)))
+    .returning({ id: ideas.id })
+    .all();
+  return deleted.length > 0;
 }
 
 function searchClause(q: string | undefined): SQL | null {

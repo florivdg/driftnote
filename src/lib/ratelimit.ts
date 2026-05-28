@@ -52,14 +52,29 @@ export function rateLimitedResponse(retryAfter: number): Response {
 
 export type Gate<T> = { ok: true; user: T } | { ok: false; res: Response };
 
-export function gateRead<T extends { id: string }>(
+function gate<T extends { id: string }>(
+  bucket: Bucket,
   user: T | null,
   route: string,
 ): Gate<T> {
   if (!user)
     return { ok: false, res: new Response("Unauthorized", { status: 401 }) };
-  const gate = checkRate(readBucket, user.id);
-  if (gate.ok) return { ok: true, user };
+  const result = checkRate(bucket, user.id);
+  if (result.ok) return { ok: true, user };
   audit("rate_limited", { userId: user.id, route });
-  return { ok: false, res: rateLimitedResponse(gate.retryAfter) };
+  return { ok: false, res: rateLimitedResponse(result.retryAfter) };
+}
+
+export function gateRead<T extends { id: string }>(
+  user: T | null,
+  route: string,
+): Gate<T> {
+  return gate(readBucket, user, route);
+}
+
+export function gateWrite<T extends { id: string }>(
+  user: T | null,
+  route: string,
+): Gate<T> {
+  return gate(writeBucket, user, route);
 }
