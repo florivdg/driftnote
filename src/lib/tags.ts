@@ -72,10 +72,11 @@ export function hashtagRenamer(
 }
 
 // Build a body rewriter that drops the leading # of every #name token, leaving
-// the bare word as plain text.
+// the bare word as plain text. The matched text is kept verbatim (only the #
+// is removed) so a mixed-case #Gift stays "Gift" in prose, not "gift".
 export function hashtagStripper(name: string): (body: string) => string {
   const re = hashtagTokenRe(name);
-  return (body) => body.replace(re, name);
+  return (body) => body.replace(re, (match) => match.slice(1));
 }
 
 // Deterministic hue for unknown tags. Palette names short-circuit.
