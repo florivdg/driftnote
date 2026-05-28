@@ -2,6 +2,9 @@ import { defineMiddleware } from "astro:middleware";
 import type { APIContext } from "astro";
 import { auth } from "@/lib/auth";
 import { audit } from "@/lib/audit";
+import { db } from "@/lib/db/client";
+import { user as userTable } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 // OAuth + MCP endpoints are cross-origin by spec (token, register, MCP RPC).
 // /api/mcp gates itself via withMcpAuth (OAuth bearer token), not the session
@@ -70,7 +73,58 @@ function resolveAuthResponse(
   return null;
 }
 
+// Local-only escape hatch for exercising the app without a passkey ceremony.
+// Opt-in via DRIFTNOTE_AUTH_BYPASS=1, AND only when BETTER_AUTH_URL points at
+// localhost. A real deployment must set BETTER_AUTH_URL to its public domain
+// (the passkey rpID derives from it), so even if the flag leaks into prod env it
+// can't disable auth there. Resolves a real user row (FKs on ideas/tags require
+// one) — DRIFTNOTE_AUTH_BYPASS_EMAIL picks which, else the first user. Returns
+// null if the table is empty so the normal unauth redirect still fires.
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+function isLocalhostUrl(raw: string | undefined): boolean {
+  try {
+    return LOCAL_HOSTS.has(new URL(raw ?? "http://localhost:4321").hostname);
+  } catch {
+    return false;
+  }
+}
+
+const AUTH_BYPASS =
+  process.env.DRIFTNOTE_AUTH_BYPASS === "1" &&
+  isLocalhostUrl(process.env.BETTER_AUTH_URL);
+
+function bypassUser(): App.Locals["user"] {
+  const email = process.env.DRIFTNOTE_AUTH_BYPASS_EMAIL;
+  const row = email
+    ? db
+        .select()
+        .from(userTable)
+        .where(eq(userTable.email, email.toLowerCase()))
+        .get()
+    : db.select().from(userTable).limit(1).get();
+  if (!row) return null;
+  return { id: row.id, name: row.name, email: row.email, image: row.image };
+}
+
+function applyBypass(ctx: APIContext): void {
+  const user = bypassUser();
+  ctx.locals.user = user;
+  ctx.locals.session = user
+    ? {
+        id: "bypass",
+        token: "bypass",
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 86_400_000),
+      }
+    : null;
+}
+
 async function attachSession(ctx: APIContext): Promise<void> {
+  if (AUTH_BYPASS) {
+    applyBypass(ctx);
+    return;
+  }
   const result = await auth.api.getSession({ headers: ctx.request.headers });
   ctx.locals.user = result ? result.user : null;
   ctx.locals.session = result ? result.session : null;
