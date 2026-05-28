@@ -1,6 +1,6 @@
 import { parseTags } from "@/lib/url";
 import { parseSourceParam } from "@/lib/validation";
-import { isPlainLeftClick } from "@/lib/dom";
+import { isPlainLeftClick } from "@/lib/mouse";
 
 export type Filters = {
   q: string;

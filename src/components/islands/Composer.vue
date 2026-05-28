@@ -8,7 +8,7 @@ import {
   watch,
 } from "vue";
 import { extractTags } from "@/lib/tags";
-import { isPlainHotkey, isSaveHotkey } from "@/lib/dom";
+import { isPlainHotkey, isSaveHotkey } from "@/lib/keyboard";
 import { notifyStreamChanged } from "@/lib/url-state";
 
 const props = defineProps<{

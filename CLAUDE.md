@@ -91,7 +91,7 @@ The masthead's "N ENTRIES / N TAGS" counters and the issue header's "N unfinishe
 
 `bun run lint` runs oxlint with **type-aware** rules enabled (`options.typeAware: true` in `.oxlintrc.json`, backed by the `oxlint-tsgolint` dep). It catches real bugs that surface-level lint misses, e.g. `await` on synchronous Drizzle `.get()` calls. Keep it green.
 
-`bun run fallow` is configured to be strict: dead code, duplication, and per-function complexity (CRAP) all gate. The CRAP threshold is **30**, which at the project's 0% automated coverage maps to a cyclomatic complexity of **5**. Treat any function reaching 5 cyc as needing extraction — `src/lib/validation.ts`, `src/lib/dom.ts`, and the per-clause helpers in `src/lib/ideas.ts` are examples of the pattern.
+`bun run fallow` is configured to be strict: dead code, duplication, and per-function complexity (CRAP) all gate. The CRAP threshold is **30**, which at the project's 0% automated coverage maps to a cyclomatic complexity of **5**. Treat any function reaching 5 cyc as needing extraction — `src/lib/validation.ts`, `src/lib/keyboard.ts`, and the per-clause helpers in `src/lib/ideas.ts` are examples of the pattern.
 
 Two specific suppressions live in `.fallowrc.json`:
 

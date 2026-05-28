@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
-import { isPlainHotkey } from "@/lib/dom";
+import { isPlainHotkey } from "@/lib/keyboard";
 import { setQuery } from "@/lib/url";
 import { applyURL, subscribeFilters } from "@/lib/url-state";
 
