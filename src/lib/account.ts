@@ -1,6 +1,8 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, gt, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db/client";
 import { passkey, session, user } from "@/lib/db/schema";
+
+export type PasskeyDeleteResult = "deleted" | "last" | "missing";
 
 export type PasskeySummary = {
   id: string;
@@ -47,7 +49,7 @@ export async function listSessions(userId: string): Promise<SessionSummary[]> {
       createdAt: session.createdAt,
     })
     .from(session)
-    .where(eq(session.userId, userId))
+    .where(and(eq(session.userId, userId), gt(session.expiresAt, new Date())))
     .orderBy(session.createdAt);
   return rows.map((r) => ({
     id: r.id,
@@ -57,23 +59,31 @@ export async function listSessions(userId: string): Promise<SessionSummary[]> {
   }));
 }
 
-export async function countPasskeys(userId: string): Promise<number> {
-  const rows = await db
-    .select({ id: passkey.id })
-    .from(passkey)
-    .where(eq(passkey.userId, userId));
-  return rows.length;
-}
-
 export async function deletePasskey(
   userId: string,
   id: string,
-): Promise<boolean> {
+): Promise<PasskeyDeleteResult> {
+  // Last-key guard inside the DELETE: the count subquery is evaluated as part
+  // of the single (write-locked) statement, so concurrent deletes of different
+  // passkeys can't both pass and drop the user to zero credentials.
   const deleted = await db
     .delete(passkey)
-    .where(and(eq(passkey.id, id), eq(passkey.userId, userId)))
+    .where(
+      and(
+        eq(passkey.id, id),
+        eq(passkey.userId, userId),
+        sql`(select count(*) from ${passkey} where ${passkey.userId} = ${userId}) > 1`,
+      ),
+    )
     .returning({ id: passkey.id });
-  return deleted.length > 0;
+  if (deleted.length > 0) return "deleted";
+  // Nothing deleted: tell "only passkey" apart from "wrong/foreign id".
+  const existing = db
+    .select({ id: passkey.id })
+    .from(passkey)
+    .where(and(eq(passkey.id, id), eq(passkey.userId, userId)))
+    .get();
+  return existing ? "last" : "missing";
 }
 
 export async function deleteSession(
