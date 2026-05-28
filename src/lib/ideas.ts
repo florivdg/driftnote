@@ -362,54 +362,56 @@ export async function countVoice(userId: string): Promise<number> {
 export type TagRow = typeof tags.$inferSelect;
 export type TagMutation = { tag: TagRow; merged: boolean };
 
-async function findTag(
-  tx: Tx,
-  userId: string,
-  name: string,
-): Promise<TagRow | undefined> {
-  const rows = await tx
+function findTag(tx: Tx, userId: string, name: string): TagRow | undefined {
+  const rows = tx
     .select()
     .from(tags)
-    .where(and(eq(tags.userId, userId), eq(tags.name, name)));
+    .where(and(eq(tags.userId, userId), eq(tags.name, name)))
+    .all();
   return rows[0];
 }
 
 // Move every link off the source tag onto the target (deduping links the idea
 // already has), then drop the source row. The FK cascade clears its old links.
-async function mergeTagLinks(
-  tx: Tx,
-  sourceId: string,
-  targetId: string,
-): Promise<void> {
+function mergeTagLinks(tx: Tx, sourceId: string, targetId: string): void {
   tx.run(
     sql`INSERT OR IGNORE INTO idea_tags (idea_id, tag_id)
         SELECT idea_id, ${targetId} FROM idea_tags WHERE tag_id = ${sourceId}`,
   );
-  await tx.delete(tags).where(eq(tags.id, sourceId));
+  tx.delete(tags).where(eq(tags.id, sourceId)).run();
 }
 
 // Rename a tag, or merge it into an existing one when the new name is taken.
+//
+// The transaction callback is SYNCHRONOUS on purpose (see the note above
+// resolveDesiredTags): bun-sqlite wraps BEGIN/COMMIT synchronously, so an async
+// callback would commit before the awaited statements ran — forfeiting both
+// atomicity and the guarantee that the lookup and the rename/merge happen as one
+// uninterrupted step. Running eagerly closes the check-then-act window where a
+// concurrent insert of `newName` could otherwise slip between the target lookup
+// and the UPDATE and trip the uniq_tags_user_name index.
 export async function renameOrMergeTag(
   userId: string,
   oldName: string,
   newName: string,
 ): Promise<TagMutation | null> {
-  return db.transaction(async (tx) => {
-    const source = await findTag(tx, userId, oldName);
+  return db.transaction((tx) => {
+    const source = findTag(tx, userId, oldName);
     if (!source) return null;
     if (newName === oldName) return { tag: source, merged: false };
 
-    const target = await findTag(tx, userId, newName);
+    const target = findTag(tx, userId, newName);
     if (target) {
-      await mergeTagLinks(tx, source.id, target.id);
+      mergeTagLinks(tx, source.id, target.id);
       return { tag: target, merged: true };
     }
 
-    const renamed = await tx
+    const renamed = tx
       .update(tags)
       .set({ name: newName })
       .where(eq(tags.id, source.id))
-      .returning();
+      .returning()
+      .all();
     return { tag: renamed[0], merged: false };
   });
 }
