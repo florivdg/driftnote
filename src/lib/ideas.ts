@@ -358,3 +358,76 @@ export async function countVoice(userId: string): Promise<number> {
     .get();
   return row?.n ?? 0;
 }
+
+export type TagRow = typeof tags.$inferSelect;
+export type TagMutation = { tag: TagRow; merged: boolean };
+
+async function findTag(
+  tx: Tx,
+  userId: string,
+  name: string,
+): Promise<TagRow | undefined> {
+  const rows = await tx
+    .select()
+    .from(tags)
+    .where(and(eq(tags.userId, userId), eq(tags.name, name)));
+  return rows[0];
+}
+
+// Move every link off the source tag onto the target (deduping links the idea
+// already has), then drop the source row. The FK cascade clears its old links.
+async function mergeTagLinks(
+  tx: Tx,
+  sourceId: string,
+  targetId: string,
+): Promise<void> {
+  const links = await tx
+    .select({ ideaId: ideaTags.ideaId })
+    .from(ideaTags)
+    .where(eq(ideaTags.tagId, sourceId));
+  for (const { ideaId } of links) {
+    await tx
+      .insert(ideaTags)
+      .values({ ideaId, tagId: targetId })
+      .onConflictDoNothing();
+  }
+  await tx.delete(tags).where(eq(tags.id, sourceId));
+}
+
+// Rename a tag, or merge it into an existing one when the new name is taken.
+export async function renameOrMergeTag(
+  userId: string,
+  oldName: string,
+  newName: string,
+): Promise<TagMutation | null> {
+  return db.transaction(async (tx) => {
+    const source = await findTag(tx, userId, oldName);
+    if (!source) return null;
+    if (newName === oldName) return { tag: source, merged: false };
+
+    const target = await findTag(tx, userId, newName);
+    if (target) {
+      await mergeTagLinks(tx, source.id, target.id);
+      return { tag: target, merged: true };
+    }
+
+    const renamed = await tx
+      .update(tags)
+      .set({ name: newName })
+      .where(eq(tags.id, source.id))
+      .returning();
+    return { tag: renamed[0], merged: false };
+  });
+}
+
+// Delete a tag; its idea_tags links go with it via ON DELETE cascade.
+export async function deleteTag(
+  userId: string,
+  name: string,
+): Promise<boolean> {
+  const deleted = await db
+    .delete(tags)
+    .where(and(eq(tags.userId, userId), eq(tags.name, name)))
+    .returning();
+  return deleted.length > 0;
+}

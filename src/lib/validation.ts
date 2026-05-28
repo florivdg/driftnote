@@ -1,4 +1,4 @@
-import { isValidHue } from "@/lib/tags";
+import { isValidHue, isValidTagName, normalizeTagName } from "@/lib/tags";
 
 export type ParsedOr<T> = { ok: true; value: T } | { ok: false; res: Response };
 
@@ -109,18 +109,57 @@ export async function parseUpdateIdeaBody(
   return { ok: true, value: { text } };
 }
 
-export async function parseHueBody(req: Request): Promise<ParsedOr<number>> {
-  const parsed = await readJson(req);
-  if (!parsed.ok) return parsed;
-  const p = parsed.value as { hue?: unknown };
-  const hue = typeof p.hue === "number" ? p.hue : Number.NaN;
-  if (!isValidHue(hue)) {
+function validateTagName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const name = normalizeTagName(value);
+  return isValidTagName(name) ? name : null;
+}
+
+function parseOptionalHue(v: unknown): ParsedOr<number | undefined> {
+  if (v === undefined) return { ok: true, value: undefined };
+  if (typeof v === "number" && isValidHue(v)) return { ok: true, value: v };
+  return {
+    ok: false,
+    res: new Response("hue must be one of HUE_CHOICES", { status: 400 }),
+  };
+}
+
+function parseOptionalName(v: unknown): ParsedOr<string | undefined> {
+  if (v === undefined) return { ok: true, value: undefined };
+  const name = validateTagName(v);
+  if (name !== null) return { ok: true, value: name };
+  return {
+    ok: false,
+    res: new Response("name must be a valid tag", { status: 400 }),
+  };
+}
+
+export type TagPatch = { hue?: number; newName?: string };
+
+function buildPatch(
+  hue: number | undefined,
+  newName: string | undefined,
+): ParsedOr<TagPatch> {
+  if (hue === undefined && newName === undefined) {
     return {
       ok: false,
-      res: new Response("hue must be one of HUE_CHOICES", { status: 400 }),
+      res: new Response("nothing to update", { status: 400 }),
     };
   }
-  return { ok: true, value: hue };
+  return { ok: true, value: { hue, newName } };
+}
+
+export async function parseTagPatchBody(
+  req: Request,
+): Promise<ParsedOr<TagPatch>> {
+  const parsed = await readJson(req);
+  if (!parsed.ok) return parsed;
+  const p = parsed.value as { hue?: unknown; name?: unknown };
+  const hue = parseOptionalHue(p.hue);
+  if (!hue.ok) return hue;
+  const name = parseOptionalName(p.name);
+  if (!name.ok) return name;
+  return buildPatch(hue.value, name.value);
 }
 
 export function parseSourceParam(

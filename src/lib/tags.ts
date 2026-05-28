@@ -26,6 +26,17 @@ export function isValidHue(n: number): n is Hue {
   return (HUE_CHOICES as readonly number[]).includes(n);
 }
 
+// A tag name on its own (no leading #), matching the hashtag grammar below.
+const TAG_NAME_RE = /^[a-z][a-z0-9_-]*$/;
+
+export function normalizeTagName(raw: string): string {
+  return raw.trim().toLowerCase();
+}
+
+export function isValidTagName(name: string): boolean {
+  return name.length <= 50 && TAG_NAME_RE.test(name);
+}
+
 // Hashtag regex MUST match the sketch verbatim so seeded vs composed parse identically.
 const TAG_RE = /#([a-z][a-z0-9_-]*)/gi;
 
