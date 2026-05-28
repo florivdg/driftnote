@@ -2,6 +2,13 @@
 import { computed, nextTick, onBeforeUnmount, ref, useTemplateRef } from "vue";
 import { signOutAndRedirect } from "@/lib/account-actions";
 import { MONTHS_SHORT, WEEKDAYS_SHORT } from "@/lib/time";
+import {
+  anchorBelow,
+  attachDismiss,
+  createDismissHandlers,
+  detachDismiss,
+  placePopover,
+} from "@/lib/popover";
 
 const props = defineProps<{
   name?: string;
@@ -20,47 +27,29 @@ const sessionDate = `${WEEKDAYS_SHORT[now.getDay()]} · ${MONTHS_SHORT[now.getMo
 
 const displayName = computed(() => props.name?.trim() || props.email || "you");
 
+const dismiss = createDismissHandlers({
+  trigger: () => triggerRef.value,
+  surface: () => menuRef.value,
+  close: closeMenu,
+});
+
 function openMenu() {
-  const r = triggerRef.value!.getBoundingClientRect();
-  const top = r.bottom + 10;
-  const right = Math.max(12, window.innerWidth - r.right);
+  const pos = anchorBelow(triggerRef.value!, 10);
   open.value = true;
-  setTimeout(() => {
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-  }, 0);
+  attachDismiss(dismiss);
   void nextTick().then(() => {
-    const menu = menuRef.value;
-    if (menu) {
-      menu.style.setProperty("--popover-top", `${top}px`);
-      menu.style.setProperty("--popover-right", `${right}px`);
-      menu.querySelector<HTMLElement>("a, button")?.focus();
-    }
+    if (menuRef.value) placePopover(menuRef.value, pos);
   });
 }
 
 function closeMenu() {
   open.value = false;
-  document.removeEventListener("mousedown", onDoc);
-  document.removeEventListener("keydown", onKey);
+  detachDismiss(dismiss);
 }
 
 function toggleMenu() {
   if (open.value) closeMenu();
   else openMenu();
-}
-
-function onDoc(e: MouseEvent) {
-  if (menuRef.value && !menuRef.value.contains(e.target as Node)) {
-    closeMenu();
-  }
-}
-
-function onKey(e: KeyboardEvent) {
-  if (e.key === "Escape") {
-    closeMenu();
-    triggerRef.value?.focus();
-  }
 }
 
 async function handleSignOut() {
@@ -76,8 +65,7 @@ async function handleSignOut() {
 }
 
 onBeforeUnmount(() => {
-  document.removeEventListener("mousedown", onDoc);
-  document.removeEventListener("keydown", onKey);
+  detachDismiss(dismiss);
 });
 </script>
 

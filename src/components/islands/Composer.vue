@@ -8,7 +8,7 @@ import {
   watch,
 } from "vue";
 import { extractTags } from "@/lib/tags";
-import { isPlainHotkey } from "@/lib/dom";
+import { isPlainHotkey, isSaveHotkey } from "@/lib/dom";
 import { notifyStreamChanged } from "@/lib/url-state";
 
 const props = defineProps<{
@@ -116,7 +116,7 @@ async function submit() {
 }
 
 function onKeyDown(e: KeyboardEvent) {
-  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+  if (isSaveHotkey(e)) {
     e.preventDefault();
     submit();
   }

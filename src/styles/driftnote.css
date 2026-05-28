@@ -1140,6 +1140,146 @@ body[data-theme="dark"] .theme-toggle .knob {
   color: var(--accent);
 }
 
+/* Note action menu (kebab) */
+.entry-menu {
+  margin-left: auto;
+  position: relative;
+}
+.entry-menu-trigger {
+  width: 24px;
+  height: 24px;
+}
+.entry-menu-pop {
+  position: fixed;
+  top: var(--popover-top);
+  right: var(--popover-right);
+  z-index: 1000;
+  width: 156px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.32),
+    0 2px 6px rgba(0, 0, 0, 0.18);
+  animation: um-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--font-ui);
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--ink);
+}
+.entry-menu-pop::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  right: 14px;
+  width: 8px;
+  height: 8px;
+  background: var(--surface);
+  border-left: 1px solid var(--rule-strong);
+  border-top: 1px solid var(--rule-strong);
+  transform: rotate(45deg);
+}
+.entry-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: color 100ms ease;
+  text-align: left;
+}
+.entry-menu-item:hover,
+.entry-menu-item:focus-visible {
+  color: var(--ink);
+}
+.entry-menu-item[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.entry-menu-mark {
+  width: 8px;
+  height: 8px;
+  background: var(--ink-4);
+  border-radius: 1px;
+  flex-shrink: 0;
+  transition: background 100ms ease;
+}
+.entry-menu-item:hover .entry-menu-mark {
+  background: var(--accent);
+}
+.entry-menu-item-del:hover .entry-menu-mark,
+.entry-menu-item-del.confirming .entry-menu-mark {
+  background: var(--hot);
+}
+.entry-menu-item-del.confirming .entry-menu-label {
+  color: var(--hot);
+  font-style: italic;
+}
+.entry-menu-label {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  text-transform: lowercase;
+}
+.entry-menu-item:hover .entry-menu-label,
+.entry-menu-item:focus-visible .entry-menu-label {
+  font-style: italic;
+}
+.entry-menu-error {
+  margin: 4px 0 2px;
+  padding-left: 20px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--hot);
+}
+
+/* Inline note editor */
+.entry-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.entry-edit-area {
+  width: 100%;
+  min-height: 64px;
+  max-height: 320px;
+  resize: none;
+  border: 1px solid var(--rule);
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-family: var(--font-display);
+  font-size: var(--entry-body-size);
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--ink);
+  letter-spacing: -0.012em;
+}
+.entry-edit-area:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--rule-strong);
+}
+.entry-edit-tags {
+  padding: 0;
+}
+.entry-edit-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.entry-edit-bar .hint {
+  margin-right: auto;
+}
+
 /* ---------- Chip ---------- */
 .chip {
   display: inline-flex;

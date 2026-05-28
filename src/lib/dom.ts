@@ -13,6 +13,10 @@ export function isPlainHotkey(e: KeyboardEvent, key: string): boolean {
   return !isTypingInInput(document.activeElement);
 }
 
+export function isSaveHotkey(e: KeyboardEvent): boolean {
+  return (e.metaKey || e.ctrlKey) && e.key === "Enter";
+}
+
 function hasMouseModifier(e: MouseEvent): boolean {
   return e.metaKey || e.ctrlKey || e.shiftKey || e.altKey;
 }

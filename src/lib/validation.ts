@@ -93,6 +93,22 @@ export async function parseCreateIdeaBody(
   return { ok: true, value: { text, source } };
 }
 
+export async function parseUpdateIdeaBody(
+  req: Request,
+): Promise<ParsedOr<{ text: string }>> {
+  const parsed = await readJson(req);
+  if (!parsed.ok) return parsed;
+  const p = parsed.value as { text?: unknown };
+  const text = validateIdeaText(p.text);
+  if (text === null) {
+    return {
+      ok: false,
+      res: new Response("text must be 1-4000 chars", { status: 400 }),
+    };
+  }
+  return { ok: true, value: { text } };
+}
+
 export async function parseHueBody(req: Request): Promise<ParsedOr<number>> {
   const parsed = await readJson(req);
   if (!parsed.ok) return parsed;
