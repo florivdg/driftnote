@@ -1,3 +1,10 @@
+// dayLabel/formatTime run during both SSR and client hydration. Passing
+// `undefined` as the locale uses the runtime default, which differs between the
+// server (Bun → en-US) and the browser (the user's locale) and produces Vue
+// hydration mismatches. Pin a fixed locale so both sides render identically;
+// en-US matches the rest of the UI, which is hard-coded English.
+const LOCALE = "en-US";
+
 export const WEEKDAYS_SHORT = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 export const MONTHS_SHORT = [
   "JAN",
@@ -39,9 +46,9 @@ export function dayLabel(d: Date, now: Date = new Date()): string {
   if (sameDay(d, yesterday)) return "Yesterday";
   const diff = (today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
   if (diff < 7) {
-    return d.toLocaleDateString(undefined, { weekday: "long" });
+    return d.toLocaleDateString(LOCALE, { weekday: "long" });
   }
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return d.toLocaleDateString(LOCALE, { month: "short", day: "numeric" });
 }
 
 export function formatTime(ts: number, now: number = Date.now()): string {
@@ -50,7 +57,7 @@ export function formatTime(ts: number, now: number = Date.now()): string {
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
   return d
-    .toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    .toLocaleTimeString(LOCALE, { hour: "numeric", minute: "2-digit" })
     .toLowerCase();
 }
 
