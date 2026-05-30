@@ -6,14 +6,29 @@ import { groupByDay } from "@/lib/time";
 import {
   currentFilters,
   filtersToSearch,
+  initialFilters,
   subscribeFilters,
   subscribeStreamChanged,
   type Filters,
 } from "@/lib/url-state";
 import { createAbortableFetcher, fetchJSON } from "@/lib/fetcher";
+import { useUndoDelete, type DeletedNote } from "@/lib/use-undo-delete";
 import FilterStrip from "@/components/vue/FilterStrip.vue";
 import DayGroup from "@/components/vue/DayGroup.vue";
 import IdeaCard from "@/components/vue/IdeaCard.vue";
+import UndoToast from "@/components/vue/UndoToast.vue";
+
+function isFilterActive(f: Filters): boolean {
+  return [
+    f.q !== "",
+    f.tags.length > 0,
+    f.untagged,
+    f.source !== null,
+    f.archived,
+    f.from !== null,
+    f.to !== null,
+  ].some(Boolean);
+}
 
 const props = defineProps<{
   initial: {
@@ -23,6 +38,10 @@ const props = defineProps<{
     tags: string[];
     untagged: boolean;
     source: "text" | "voice" | null;
+    archived: boolean;
+    from: string | null;
+    to: string | null;
+    sort: "newest" | "oldest";
   };
 }>();
 
@@ -30,14 +49,10 @@ const ideas = shallowRef<IdeaWithTags[]>(props.initial.ideas);
 const activeTagHues = shallowRef<{ name: string; hue: number }[]>(
   props.initial.activeTagHues,
 );
-const filters = shallowRef<Filters>({
-  q: props.initial.query,
-  tags: props.initial.tags,
-  untagged: props.initial.untagged,
-  source: props.initial.source,
-});
+const filters = shallowRef<Filters>(initialFilters(props.initial));
 
 const groups = computed(() => groupByDay(ideas.value));
+const filterActive = computed(() => isFilterActive(filters.value));
 
 // O(N×T) once per ideas change, then O(M) lookups instead of O(N×M×T) scans.
 const hueByTagName = computed(() => {
@@ -83,6 +98,13 @@ async function loadIdeas(f: Filters): Promise<void> {
   }
 }
 
+const undo = useUndoDelete(() => void loadIdeas(currentFilters()));
+
+function onDeleted(note: DeletedNote): void {
+  undo.offer(note);
+  void loadIdeas(currentFilters());
+}
+
 onMounted(() => {
   unsubFilters = subscribeFilters((f) => {
     filters.value = f;
@@ -107,10 +129,27 @@ onBeforeUnmount(() => {
     :query="filters.q"
     :untagged="filters.untagged"
     :source="filters.source"
+    :archived="filters.archived"
+    :from="filters.from"
+    :to="filters.to"
+    :sort="filters.sort"
   />
-  <div v-if="ideas.length === 0" class="stream-empty">
-    <h2>Nothing here.</h2>
-    <p>Loosen a filter, or jot down what's on your mind.</p>
+  <div v-if="ideas.length === 0 && filterActive" class="stream-empty">
+    <h3>Nothing here.</h3>
+    <p>Loosen a filter, or jot down what&rsquo;s on your mind.</p>
+  </div>
+  <div
+    v-else-if="ideas.length === 0"
+    class="stream-empty stream-empty--onboarding"
+    aria-label="Welcome — no notes yet"
+  >
+    <h3>Your stream starts here.</h3>
+    <p>Capture a thought in the composer below.</p>
+    <ul class="stream-empty-hints" aria-label="Keyboard shortcuts">
+      <li><kbd>#</kbd> prefix a word to tag it</li>
+      <li><kbd>⌘↵</kbd> to save from the keyboard</li>
+      <li><kbd>/</kbd> to jump to search</li>
+    </ul>
   </div>
   <template v-else>
     <DayGroup
@@ -125,8 +164,16 @@ onBeforeUnmount(() => {
         :idea="idea"
         :index="idx"
         :url="urlString"
+        @deleted="onDeleted"
       />
     </DayGroup>
   </template>
   <div class="stream-end">End of stream</div>
+  <UndoToast
+    v-if="undo.pending.value"
+    message="Note deleted."
+    :busy="undo.restoring.value"
+    @undo="undo.undo"
+    @dismiss="undo.dismiss"
+  />
 </template>

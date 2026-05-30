@@ -1035,6 +1035,24 @@ body[data-theme="dark"] .theme-toggle .knob {
 .filter-strip .clear:hover {
   color: var(--ink);
 }
+.filter-strip .filter-sort {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 6px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.filter-strip .filter-sort:hover {
+  color: var(--ink);
+}
+/* When chips are present the .chips flex:1 already pushes sort+clear right. */
+.filter-strip .chips ~ .filter-sort {
+  margin-left: 0;
+}
 
 /* ---------- Day group ---------- */
 .day-group {
@@ -1230,6 +1248,26 @@ body[data-theme="dark"] .theme-toggle .knob {
   border-radius: 99px;
 }
 .entry-foot .source.voice {
+  color: var(--accent);
+}
+.entry-foot .entry-link,
+.entry-foot .entry-copy {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+.entry-foot .entry-link:hover,
+.entry-foot .entry-copy:hover {
+  color: var(--ink);
+}
+.entry-foot .entry-pinned {
   color: var(--accent);
 }
 
@@ -1465,6 +1503,41 @@ body[data-theme="dark"] .theme-toggle .knob {
   text-transform: uppercase;
   color: var(--ink-3);
   margin: 0;
+}
+.stream-empty-hints {
+  list-style: none;
+  margin: 24px auto 0;
+  padding: 0;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.stream-empty-hints li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stream-empty-hints kbd {
+  font-family: inherit;
+  font-size: 9.5px;
+  color: var(--ink-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  padding: 0 5px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  letter-spacing: 0;
+  text-transform: none;
+  min-width: 22px;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 /* Guest banner */
@@ -2370,6 +2443,123 @@ body[data-theme="dark"] .theme-toggle .knob {
 .account-danger-go:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* Archive / export */
+.account-export {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 16px 4px 4px;
+}
+.account-export-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.account-export-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  letter-spacing: -0.012em;
+  text-transform: lowercase;
+  color: var(--ink-2);
+}
+.account-export-sub {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.account-export-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.account-export-btn {
+  text-decoration: none;
+}
+.account-export-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Undo toast — transient affordance after a destructive action */
+.undo-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 12px 10px 18px;
+  background: var(--surface-2);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  animation: undo-toast-in 160ms ease;
+}
+.undo-toast-msg {
+  font-family: var(--font-display);
+  font-size: 16px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.undo-toast-btn {
+  border: 1px solid var(--rule-strong);
+  background: transparent;
+  color: var(--ink);
+  border-radius: var(--radius);
+  padding: 5px 11px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease;
+}
+.undo-toast-btn:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.undo-toast-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.undo-toast-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius);
+  transition: color 120ms ease;
+}
+.undo-toast-close:hover {
+  color: var(--ink);
+}
+@keyframes undo-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
 }
 
 /* ---------- Reduced motion ---------- */

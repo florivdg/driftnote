@@ -21,7 +21,7 @@ export const MONTHS_SHORT = [
   "DEC",
 ];
 
-export type IdeaLike = { id: string; createdAt: number };
+export type IdeaLike = { id: string; createdAt: number; pinned?: boolean };
 
 export type DayGroup<T extends IdeaLike> = {
   key: string;
@@ -71,7 +71,14 @@ export function groupByDay<T extends IdeaLike>(ideas: T[]): DayGroup<T>[] {
   }
   const groups: DayGroup<T>[] = [];
   for (const [key, items] of buckets) {
-    items.sort((a, b) => b.createdAt - a.createdAt);
+    // Pinned notes float to the top of their day; the server already orders the
+    // stream pinned-first, but day-bucketing would otherwise re-sort by recency
+    // and drop a pinned note below a newer same-day one. All items in a bucket
+    // share one calendar day, so the day label/order (below) stay correct.
+    items.sort(
+      (a, b) =>
+        (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.createdAt - a.createdAt,
+    );
     groups.push({
       key,
       label: dayLabel(new Date(items[0].createdAt)),

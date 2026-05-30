@@ -4,13 +4,13 @@ import {
   nextTick,
   onBeforeUnmount,
   ref,
+  toRef,
   useTemplateRef,
   watch,
 } from "vue";
 import type { IdeaWithTags } from "@/lib/ideas";
-import { formatTime } from "@/lib/time";
+import { useIdeaView } from "@/lib/idea-view";
 import { toggleTag } from "@/lib/url";
-import { parseIdeaBody } from "@/lib/idea-body";
 import { extractTags } from "@/lib/tags";
 import { interceptNav, notifyStreamChanged } from "@/lib/url-state";
 import { isSaveHotkey } from "@/lib/keyboard";
@@ -28,11 +28,15 @@ const props = defineProps<{
   url: string;
 }>();
 
+const emit = defineEmits<{
+  deleted: [note: { body: string; source: "text" | "voice" }];
+}>();
+
+const { parts, timeLabel, primaryHue } = useIdeaView(toRef(props, "idea"));
 const baseURL = computed(() => new URL(props.url, "http://x"));
 const num = computed(() => String(props.index + 1).padStart(3, "0"));
-const primaryHue = computed(() => props.idea.tags[0]?.hue);
-const parts = computed(() => parseIdeaBody(props.idea.body, props.idea.tags));
-const timeLabel = computed(() => formatTime(props.idea.createdAt));
+const permalink = computed(() => `/i/${props.idea.id}`);
+const copied = ref(false);
 const stamps = computed(() =>
   props.idea.tags.map((t) => ({
     name: t.name,
@@ -127,6 +131,54 @@ async function sendDelete(): Promise<void> {
   if (!res.ok) throw new Error(`delete failed: ${res.status}`);
 }
 
+async function sendState(patch: {
+  archived?: boolean;
+  pinned?: boolean;
+}): Promise<void> {
+  const res = await fetch(`/api/ideas/${props.idea.id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`update failed: ${res.status}`);
+}
+
+async function applyState(
+  patch: { archived?: boolean; pinned?: boolean },
+  fallback: string,
+): Promise<void> {
+  if (busy.value) return;
+  busy.value = true;
+  errorMsg.value = null;
+  try {
+    await sendState(patch);
+    closeMenu();
+    notifyStreamChanged();
+  } catch (err) {
+    errorMsg.value = errMessage(err, fallback);
+  } finally {
+    busy.value = false;
+  }
+}
+
+function toggleArchive() {
+  void applyState({ archived: !props.idea.archived }, "could not archive");
+}
+
+function togglePin() {
+  void applyState({ pinned: !props.idea.pinned }, "could not pin");
+}
+
+async function copyBody() {
+  try {
+    await navigator.clipboard.writeText(props.idea.body);
+    copied.value = true;
+    setTimeout(() => (copied.value = false), 1200);
+  } catch (err) {
+    errorMsg.value = errMessage(err, "could not copy");
+  }
+}
+
 async function saveEdit() {
   const text = draft.value.trim();
   if (!text || busy.value) return;
@@ -168,7 +220,9 @@ async function performDelete() {
   try {
     await sendDelete();
     closeMenu();
-    notifyStreamChanged();
+    // Hand the body + source up so StreamView can offer an undo that re-creates
+    // the note; StreamView owns the refetch after the toast resolves.
+    emit("deleted", { body: props.idea.body, source: props.idea.source });
   } catch (err) {
     errorMsg.value = errMessage(err, "could not delete");
   } finally {
@@ -240,6 +294,30 @@ onBeforeUnmount(() => {
             </button>
             <button
               type="button"
+              class="entry-menu-item"
+              role="menuitem"
+              :disabled="busy"
+              @click="togglePin"
+            >
+              <span class="entry-menu-mark"></span>
+              <span class="entry-menu-label">{{
+                idea.pinned ? "unpin" : "pin"
+              }}</span>
+            </button>
+            <button
+              type="button"
+              class="entry-menu-item"
+              role="menuitem"
+              :disabled="busy"
+              @click="toggleArchive"
+            >
+              <span class="entry-menu-mark"></span>
+              <span class="entry-menu-label">{{
+                idea.archived ? "unarchive" : "archive"
+              }}</span>
+            </button>
+            <button
+              type="button"
               class="entry-menu-item entry-menu-item-del"
               :class="{ confirming: confirmingDelete }"
               role="menuitem"
@@ -305,11 +383,24 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="entry-foot">
+      <span v-if="idea.pinned" class="entry-pinned" title="Pinned">pinned</span>
+      <span v-if="idea.pinned" class="dot-sep"></span>
       <span>{{ timeLabel }}</span>
+      <template v-if="idea.source !== 'voice'">
+        <span class="dot-sep"></span>
+        <span class="source">typed</span>
+      </template>
       <span class="dot-sep"></span>
-      <span :class="'source ' + (idea.source === 'voice' ? 'voice' : '')">
-        {{ idea.source === "voice" ? "voice" : "typed" }}
-      </span>
+      <a class="entry-link" :href="permalink" title="Open permalink"> link </a>
+      <span class="dot-sep"></span>
+      <button
+        type="button"
+        class="entry-copy"
+        :title="copied ? 'Copied' : 'Copy text'"
+        @click="copyBody"
+      >
+        {{ copied ? "copied" : "copy" }}
+      </button>
     </div>
   </article>
 </template>

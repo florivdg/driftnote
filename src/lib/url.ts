@@ -46,12 +46,29 @@ export function setQuery(url: URL, q: string): string {
 
 export function setFlag(
   url: URL,
-  key: "untagged" | "source",
+  key: "untagged" | "source" | "archived" | "sort" | "from" | "to",
   value: string | null,
 ): string {
   const params = clone(url);
   if (value === null) params.delete(key);
   else params.set(key, value);
+  return `${url.pathname}${buildSearch(params)}`;
+}
+
+// ISO date (UTC midnight) for `n` days ago, used by the "last N days" quick
+// filter. Pinning to the UTC day boundary keeps SSR and client output identical.
+export function isoDaysAgo(n: number, now: number = Date.now()): string {
+  const d = new Date(now - n * 86_400_000);
+  return d.toISOString().slice(0, 10);
+}
+
+// Apply a `?from=` lower bound while clearing any stale `?to=` upper bound,
+// so the "last N days" entry point reads as a single open-ended range.
+export function setDateFrom(url: URL, from: string | null): string {
+  const params = clone(url);
+  if (from === null) params.delete("from");
+  else params.set("from", from);
+  params.delete("to");
   return `${url.pathname}${buildSearch(params)}`;
 }
 

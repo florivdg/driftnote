@@ -1,0 +1,82 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Masthead from "@/components/Masthead.astro";
+import NoteDetail from "@/components/islands/NoteDetail.vue";
+import { getIdeaById, countIdeas, listTagsWithCounts } from "@/lib/ideas";
+import { issueNumber } from "@/lib/issueNumber";
+import { LOCALE } from "@/lib/time";
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect(
+    `/login?next=${encodeURIComponent(Astro.url.pathname)}`,
+  );
+}
+
+const id = Astro.params.id ?? "";
+const idea = await getIdeaById(user.id, id);
+if (!idea) {
+  return new Response("Note not found", {
+    status: 404,
+    headers: { "content-type": "text/plain; charset=utf-8" },
+  });
+}
+
+const tagList = await listTagsWithCounts(user.id);
+const totalIdeas = countIdeas(user.id);
+const visibleTagCount = tagList.filter((t) => t.count > 0).length;
+
+const issueNo = String(issueNumber()).padStart(3, "0");
+const dated = new Date(idea.createdAt).toLocaleDateString(LOCALE, {
+  weekday: "long",
+  month: "long",
+  day: "numeric",
+  year: "numeric",
+});
+const preview = idea.body.replace(/\s+/g, " ").trim().slice(0, 80);
+---
+
+<Layout title={`DriftNote · ${preview || "Note"}`}>
+  <div class="app">
+    <Masthead
+      user={user}
+      ideaCount={totalIdeas}
+      tagCount={visibleTagCount}
+      query=""
+    />
+    <main id="main" class="stream-wrap" tabindex="-1">
+      <div class="stream-inner">
+        <section class="issue">
+          <div class="issue-line">
+            <a class="note-back" href="/">← back to stream</a>
+            <span class="sep">·</span>
+            <span>No. {issueNo}</span>
+            <span class="sep">·</span>
+            <span>{dated}</span>
+          </div>
+          <h1 class="issue-title">A single <em>thought</em>.</h1>
+          <p class="issue-sub">
+            Permalink — copy it, link it, or send it back to the stream.
+          </p>
+        </section>
+
+        <NoteDetail client:load idea={idea} />
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<style>
+  .note-back {
+    color: var(--ink-3);
+    transition: color 120ms ease;
+  }
+  .note-back:hover {
+    color: var(--ink);
+  }
+  .note-detail {
+    margin-top: 8px;
+  }
+</style>
