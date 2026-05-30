@@ -18,6 +18,10 @@ import DayGroup from "@/components/vue/DayGroup.vue";
 import IdeaCard from "@/components/vue/IdeaCard.vue";
 import UndoToast from "@/components/vue/UndoToast.vue";
 
+function isFilterActive(f: Filters): boolean {
+  return f.q !== "" || f.tags.length > 0 || f.untagged || f.source !== null;
+}
+
 const props = defineProps<{
   initial: {
     ideas: IdeaWithTags[];
@@ -40,6 +44,7 @@ const activeTagHues = shallowRef<{ name: string; hue: number }[]>(
 const filters = shallowRef<Filters>(initialFilters(props.initial));
 
 const groups = computed(() => groupByDay(ideas.value));
+const filterActive = computed(() => isFilterActive(filters.value));
 
 // O(N×T) once per ideas change, then O(M) lookups instead of O(N×M×T) scans.
 const hueByTagName = computed(() => {
@@ -121,9 +126,23 @@ onBeforeUnmount(() => {
     :to="filters.to"
     :sort="filters.sort"
   />
-  <div v-if="ideas.length === 0" class="stream-empty">
-    <h2>Nothing here.</h2>
-    <p>Loosen a filter, or jot down what's on your mind.</p>
+  <div v-if="ideas.length === 0 && filterActive" class="stream-empty">
+    <h3>Nothing here.</h3>
+    <p>Loosen a filter, or jot down what&rsquo;s on your mind.</p>
+  </div>
+  <div
+    v-else-if="ideas.length === 0"
+    class="stream-empty stream-empty--onboarding"
+    aria-label="Welcome — no notes yet"
+  >
+    <h3>Your stream starts here.</h3>
+    <p>Capture a thought in the composer below.</p>
+    <ul class="stream-empty-hints" aria-label="Keyboard shortcuts">
+      <li><kbd>#</kbd> prefix a word to tag it</li>
+      <li><kbd>⌘↵</kbd> to save from the keyboard</li>
+      <li><kbd>/</kbd> to jump to search</li>
+      <li><kbd>M</kbd> to record voice</li>
+    </ul>
   </div>
   <template v-else>
     <DayGroup
