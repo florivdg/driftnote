@@ -19,15 +19,15 @@ import IdeaCard from "@/components/vue/IdeaCard.vue";
 import UndoToast from "@/components/vue/UndoToast.vue";
 
 function isFilterActive(f: Filters): boolean {
-  return (
-    f.q !== "" ||
-    f.tags.length > 0 ||
-    f.untagged ||
-    f.source !== null ||
-    f.archived ||
-    f.from !== null ||
-    f.to !== null
-  );
+  return [
+    f.q !== "",
+    f.tags.length > 0,
+    f.untagged,
+    f.source !== null,
+    f.archived,
+    f.from !== null,
+    f.to !== null,
+  ].some(Boolean);
 }
 
 const props = defineProps<{
