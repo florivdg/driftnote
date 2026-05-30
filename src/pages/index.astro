@@ -9,7 +9,6 @@ import {
   listTagsWithCounts,
   countIdeas,
   countUntagged,
-  countVoice,
   type StreamFilters,
 } from "@/lib/ideas";
 import { issueNumber } from "@/lib/issueNumber";
@@ -37,14 +36,12 @@ const filters: StreamFilters = {
   source: source ?? undefined,
 };
 
-const [ideas, tagList, totalIdeas, untaggedCount, voiceCount] =
-  await Promise.all([
-    listIdeas(user.id, filters),
-    listTagsWithCounts(user.id),
-    countIdeas(user.id),
-    countUntagged(user.id),
-    countVoice(user.id),
-  ]);
+const [ideas, tagList, totalIdeas, untaggedCount] = await Promise.all([
+  listIdeas(user.id, filters),
+  listTagsWithCounts(user.id),
+  countIdeas(user.id),
+  countUntagged(user.id),
+]);
 
 const visibleTagCount = tagList.filter((t) => t.count > 0).length;
 const suggestedTags = tagList
@@ -79,7 +76,6 @@ const sidebarInitial = {
   tagList,
   totalIdeas,
   untaggedCount,
-  voiceCount,
   query: q,
   tags: activeTagNames,
   untagged,

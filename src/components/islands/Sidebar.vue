@@ -28,7 +28,6 @@ const props = defineProps<{
     tagList: TagListEntry[];
     totalIdeas: number;
     untaggedCount: number;
-    voiceCount: number;
     query: string;
     tags: string[];
     untagged: boolean;
@@ -39,7 +38,6 @@ const props = defineProps<{
 const tagList = shallowRef<TagListEntry[]>(props.initial.tagList);
 const totalIdeas = ref(props.initial.totalIdeas);
 const untaggedCount = ref(props.initial.untaggedCount);
-const voiceCount = ref(props.initial.voiceCount);
 const filters = shallowRef<Filters>({
   q: props.initial.query,
   tags: props.initial.tags,
@@ -68,7 +66,6 @@ const everythingActive = computed(
     !filters.value.source,
 );
 const untaggedActive = computed(() => filters.value.untagged);
-const voiceActive = computed(() => filters.value.source === "voice");
 
 const baseURL = computed(
   () => new URL(`/${filtersToSearch(filters.value)}`, "http://x"),
@@ -76,9 +73,6 @@ const baseURL = computed(
 
 const untaggedHref = computed(() =>
   setFlag(baseURL.value, "untagged", filters.value.untagged ? null : "1"),
-);
-const voiceHref = computed(() =>
-  setFlag(baseURL.value, "source", voiceActive.value ? null : "voice"),
 );
 function tagHref(name: string): string {
   return toggleTag(baseURL.value, name);
@@ -250,7 +244,6 @@ async function refetchTags(): Promise<void> {
     tagList.value = data.tagList;
     totalIdeas.value = data.totalIdeas;
     untaggedCount.value = data.untaggedCount;
-    voiceCount.value = data.voiceCount;
     closePickerIfGone();
   } catch (err) {
     console.error("tags fetch failed", err);
@@ -299,16 +292,6 @@ onBeforeUnmount(() => {
           <span class="dot dot--outline"></span>
           <span class="label">untagged</span>
           <span class="num">{{ untaggedCount }}</span>
-        </a>
-        <a
-          :class="'side-item' + (voiceActive ? ' active' : '')"
-          :href="voiceHref"
-          :aria-current="voiceActive ? 'page' : undefined"
-          @click="interceptNav($event, voiceHref)"
-        >
-          <span class="dot dot--outline"></span>
-          <span class="label">voice only</span>
-          <span class="num">{{ voiceCount }}</span>
         </a>
       </div>
 

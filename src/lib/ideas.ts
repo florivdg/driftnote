@@ -355,15 +355,6 @@ export async function countUntagged(userId: string): Promise<number> {
   return row?.n ?? 0;
 }
 
-export async function countVoice(userId: string): Promise<number> {
-  const row = db
-    .select({ n: sql<number>`COUNT(*)` })
-    .from(ideas)
-    .where(and(eq(ideas.userId, userId), eq(ideas.source, "voice")))
-    .get();
-  return row?.n ?? 0;
-}
-
 export type TagRow = typeof tags.$inferSelect;
 export type TagMutation = { tag: TagRow; merged: boolean };
 

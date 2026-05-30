@@ -9,5 +9,4 @@ export type TagsResponse = {
   tagList: TagListEntry[];
   totalIdeas: number;
   untaggedCount: number;
-  voiceCount: number;
 };

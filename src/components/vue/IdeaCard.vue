@@ -306,10 +306,10 @@ onBeforeUnmount(() => {
 
     <div class="entry-foot">
       <span>{{ timeLabel }}</span>
-      <span class="dot-sep"></span>
-      <span :class="'source ' + (idea.source === 'voice' ? 'voice' : '')">
-        {{ idea.source === "voice" ? "voice" : "typed" }}
-      </span>
+      <template v-if="idea.source !== 'voice'">
+        <span class="dot-sep"></span>
+        <span class="source">typed</span>
+      </template>
     </div>
   </article>
 </template>
