@@ -28,6 +28,10 @@ const props = defineProps<{
   url: string;
 }>();
 
+const emit = defineEmits<{
+  deleted: [note: { body: string; source: "text" | "voice" }];
+}>();
+
 const { parts, timeLabel, primaryHue } = useIdeaView(toRef(props, "idea"));
 const baseURL = computed(() => new URL(props.url, "http://x"));
 const num = computed(() => String(props.index + 1).padStart(3, "0"));
@@ -216,7 +220,9 @@ async function performDelete() {
   try {
     await sendDelete();
     closeMenu();
-    notifyStreamChanged();
+    // Hand the body + source up so StreamView can offer an undo that re-creates
+    // the note; StreamView owns the refetch after the toast resolves.
+    emit("deleted", { body: props.idea.body, source: props.idea.source });
   } catch (err) {
     errorMsg.value = errMessage(err, "could not delete");
   } finally {

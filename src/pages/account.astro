@@ -90,6 +90,39 @@ const pad = (n: number) => String(n).padStart(2, "0");
 
         <section class="account-section">
           <div class="account-section-label">
+            <span>Archive</span>
+            <span class="account-section-count">{pad(totalIdeas)}</span>
+          </div>
+          <div class="account-export">
+            <div class="account-export-text">
+              <span class="account-export-title">take your data with you</span>
+              <span class="account-export-sub">
+                a complete, re-importable copy of every note and tag.
+              </span>
+            </div>
+            <div class="account-export-actions">
+              <a
+                class="btn account-export-btn"
+                href="/api/export"
+                download
+                rel="nofollow"
+              >
+                download json
+              </a>
+              <a
+                class="btn account-export-btn"
+                href="/api/export?format=md"
+                download
+                rel="nofollow"
+              >
+                download markdown
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <section class="account-section">
+          <div class="account-section-label">
             <span>Departures</span>
             <span class="account-section-count">·</span>
           </div>

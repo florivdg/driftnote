@@ -12,9 +12,11 @@ import {
   type Filters,
 } from "@/lib/url-state";
 import { createAbortableFetcher, fetchJSON } from "@/lib/fetcher";
+import { useUndoDelete, type DeletedNote } from "@/lib/use-undo-delete";
 import FilterStrip from "@/components/vue/FilterStrip.vue";
 import DayGroup from "@/components/vue/DayGroup.vue";
 import IdeaCard from "@/components/vue/IdeaCard.vue";
+import UndoToast from "@/components/vue/UndoToast.vue";
 
 const props = defineProps<{
   initial: {
@@ -83,6 +85,13 @@ async function loadIdeas(f: Filters): Promise<void> {
   }
 }
 
+const undo = useUndoDelete(() => void loadIdeas(currentFilters()));
+
+function onDeleted(note: DeletedNote): void {
+  undo.offer(note);
+  void loadIdeas(currentFilters());
+}
+
 onMounted(() => {
   unsubFilters = subscribeFilters((f) => {
     filters.value = f;
@@ -129,8 +138,16 @@ onBeforeUnmount(() => {
         :idea="idea"
         :index="idx"
         :url="urlString"
+        @deleted="onDeleted"
       />
     </DayGroup>
   </template>
   <div class="stream-end">End of stream</div>
+  <UndoToast
+    v-if="undo.pending.value"
+    message="Note deleted."
+    :busy="undo.restoring.value"
+    @undo="undo.undo"
+    @dismiss="undo.dismiss"
+  />
 </template>
