@@ -486,10 +486,6 @@ export function countUntagged(userId: string): number {
   return countWhere(userId, and(NOT_ARCHIVED, HAS_NO_TAGS)!);
 }
 
-export function countVoice(userId: string): number {
-  return countWhere(userId, and(NOT_ARCHIVED, eq(ideas.source, "voice"))!);
-}
-
 export function countTextOnly(userId: string): number {
   return countWhere(userId, and(NOT_ARCHIVED, eq(ideas.source, "text"))!);
 }

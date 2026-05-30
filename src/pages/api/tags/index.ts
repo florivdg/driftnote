@@ -4,7 +4,6 @@ import {
   countIdeas,
   countTextOnly,
   countUntagged,
-  countVoice,
   listTagsWithCounts,
 } from "@/lib/ideas";
 import { gateRead } from "@/lib/ratelimit";
@@ -22,7 +21,6 @@ export const GET: APIRoute = async ({ locals }) => {
     tagList,
     totalIdeas: countIdeas(userId),
     untaggedCount: countUntagged(userId),
-    voiceCount: countVoice(userId),
     textCount: countTextOnly(userId),
     archivedCount: countArchived(userId),
   });

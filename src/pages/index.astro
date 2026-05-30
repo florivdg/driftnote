@@ -9,7 +9,6 @@ import {
   listTagsWithCounts,
   countIdeas,
   countUntagged,
-  countVoice,
   countTextOnly,
   countArchived,
   type StreamFilters,
@@ -58,7 +57,6 @@ const [ideas, tagList] = await Promise.all([
 ]);
 const totalIdeas = countIdeas(user.id);
 const untaggedCount = countUntagged(user.id);
-const voiceCount = countVoice(user.id);
 const textCount = countTextOnly(user.id);
 const archivedCount = countArchived(user.id);
 
@@ -106,7 +104,6 @@ const sidebarInitial = {
   tagList,
   totalIdeas,
   untaggedCount,
-  voiceCount,
   textCount,
   archivedCount,
   ...filterState,

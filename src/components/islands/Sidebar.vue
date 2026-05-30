@@ -29,7 +29,6 @@ const props = defineProps<{
     tagList: TagListEntry[];
     totalIdeas: number;
     untaggedCount: number;
-    voiceCount: number;
     textCount: number;
     archivedCount: number;
     query: string;
@@ -46,7 +45,6 @@ const props = defineProps<{
 const tagList = shallowRef<TagListEntry[]>(props.initial.tagList);
 const totalIdeas = ref(props.initial.totalIdeas);
 const untaggedCount = ref(props.initial.untaggedCount);
-const voiceCount = ref(props.initial.voiceCount);
 const textCount = ref(props.initial.textCount);
 const archivedCount = ref(props.initial.archivedCount);
 const filters = shallowRef<Filters>(initialFilters(props.initial));
@@ -77,7 +75,6 @@ const everythingActive = computed(() => {
   ].some(Boolean);
 });
 const untaggedActive = computed(() => filters.value.untagged);
-const voiceActive = computed(() => filters.value.source === "voice");
 const textActive = computed(() => filters.value.source === "text");
 const archivedActive = computed(() => filters.value.archived);
 const recentFrom = computed(() => isoDaysAgo(7));
@@ -91,9 +88,6 @@ const baseURL = computed(
 
 const untaggedHref = computed(() =>
   setFlag(baseURL.value, "untagged", filters.value.untagged ? null : "1"),
-);
-const voiceHref = computed(() =>
-  setFlag(baseURL.value, "source", voiceActive.value ? null : "voice"),
 );
 const textHref = computed(() =>
   setFlag(baseURL.value, "source", textActive.value ? null : "text"),
@@ -274,7 +268,6 @@ async function refetchTags(): Promise<void> {
     tagList.value = data.tagList;
     totalIdeas.value = data.totalIdeas;
     untaggedCount.value = data.untaggedCount;
-    voiceCount.value = data.voiceCount;
     textCount.value = data.textCount;
     archivedCount.value = data.archivedCount;
     closePickerIfGone();
@@ -325,16 +318,6 @@ onBeforeUnmount(() => {
           <span class="dot dot--outline"></span>
           <span class="label">untagged</span>
           <span class="num">{{ untaggedCount }}</span>
-        </a>
-        <a
-          :class="'side-item' + (voiceActive ? ' active' : '')"
-          :href="voiceHref"
-          :aria-current="voiceActive ? 'page' : undefined"
-          @click="interceptNav($event, voiceHref)"
-        >
-          <span class="dot dot--outline"></span>
-          <span class="label">voice only</span>
-          <span class="num">{{ voiceCount }}</span>
         </a>
         <a
           :class="'side-item' + (textActive ? ' active' : '')"
