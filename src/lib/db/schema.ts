@@ -27,6 +27,8 @@ export const ideas = sqliteTable(
     source: text("source").notNull().default("text"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
+    archivedAt: integer("archived_at"),
+    pinnedAt: integer("pinned_at"),
   },
   (t) => [
     index("idx_ideas_user_created").on(t.userId, t.createdAt),

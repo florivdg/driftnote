@@ -15,6 +15,13 @@
       "when": 1779873089828,
       "tag": "0001_freezing_genesis",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1780152803508,
+      "tag": "0002_damp_vertigo",
+      "breakpoints": true
     }
   ]
 }

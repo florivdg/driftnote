@@ -93,20 +93,53 @@ export async function parseCreateIdeaBody(
   return { ok: true, value: { text, source } };
 }
 
-export async function parseUpdateIdeaBody(
-  req: Request,
-): Promise<ParsedOr<{ text: string }>> {
-  const parsed = await readJson(req);
-  if (!parsed.ok) return parsed;
-  const p = parsed.value as { text?: unknown };
-  const text = validateIdeaText(p.text);
-  if (text === null) {
+export type IdeaPatch =
+  | { kind: "edit"; text: string }
+  | { kind: "state"; archived?: boolean; pinned?: boolean };
+
+function readOptionalBool(v: unknown): boolean | undefined {
+  return typeof v === "boolean" ? v : undefined;
+}
+
+function stateFromBody(p: {
+  archived?: unknown;
+  pinned?: unknown;
+}): ParsedOr<IdeaPatch> {
+  const archived = readOptionalBool(p.archived);
+  const pinned = readOptionalBool(p.pinned);
+  if (archived === undefined && pinned === undefined) {
     return {
       ok: false,
-      res: new Response("text must be 1-4000 chars", { status: 400 }),
+      res: new Response("text, archived, or pinned required", { status: 400 }),
     };
   }
-  return { ok: true, value: { text } };
+  return { ok: true, value: { kind: "state", archived, pinned } };
+}
+
+// PATCH /api/ideas/[id] accepts EITHER a body edit (`text`) OR a state toggle
+// (`archived`/`pinned`). The body is read once here and dispatched by shape:
+// a `text` field means an edit, otherwise the boolean state flags are used.
+export async function parseIdeaPatchBody(
+  req: Request,
+): Promise<ParsedOr<IdeaPatch>> {
+  const parsed = await readJson(req);
+  if (!parsed.ok) return parsed;
+  const p = parsed.value as {
+    text?: unknown;
+    archived?: unknown;
+    pinned?: unknown;
+  };
+  if (p.text !== undefined) {
+    const text = validateIdeaText(p.text);
+    if (text === null) {
+      return {
+        ok: false,
+        res: new Response("text must be 1-4000 chars", { status: 400 }),
+      };
+    }
+    return { ok: true, value: { kind: "edit", text } };
+  }
+  return stateFromBody(p);
 }
 
 function validateTagName(value: unknown): string | null {
@@ -191,4 +224,24 @@ export function parseSourceParam(
   if (v === "voice") return "voice";
   if (v === "text") return "text";
   return undefined;
+}
+
+export function parseSortParam(v: string | null): "newest" | "oldest" {
+  return v === "oldest" ? "oldest" : "newest";
+}
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// True when `v` round-trips through a real UTC calendar date (rejects e.g.
+// 2026-02-31, which Date.parse would silently roll forward).
+function isRealIsoDate(v: string): boolean {
+  const ms = Date.parse(`${v}T00:00:00.000Z`);
+  return !Number.isNaN(ms) && new Date(ms).toISOString().slice(0, 10) === v;
+}
+
+// Accept a `YYYY-MM-DD` URL param only if it names a real calendar date.
+// Returns the canonical string (so a round-trip is stable) or undefined.
+export function parseDateParam(v: string | null): string | undefined {
+  if (!v || !ISO_DATE_RE.test(v)) return undefined;
+  return isRealIsoDate(v) ? v : undefined;
 }

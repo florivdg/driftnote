@@ -10,4 +10,6 @@ export type TagsResponse = {
   totalIdeas: number;
   untaggedCount: number;
   voiceCount: number;
+  textCount: number;
+  archivedCount: number;
 };
