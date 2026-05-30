@@ -54,10 +54,10 @@ async function copyBody() {
       <span v-if="idea.archived">archived</span>
       <span v-if="idea.archived" class="dot-sep"></span>
       <span>{{ timeLabel }}</span>
-      <span class="dot-sep"></span>
-      <span :class="'source ' + (idea.source === 'voice' ? 'voice' : '')">
-        {{ idea.source === "voice" ? "voice" : "typed" }}
-      </span>
+      <template v-if="idea.source !== 'voice'">
+        <span class="dot-sep"></span>
+        <span class="source">typed</span>
+      </template>
       <span class="dot-sep"></span>
       <button
         type="button"
