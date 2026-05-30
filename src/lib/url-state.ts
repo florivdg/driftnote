@@ -1,5 +1,9 @@
 import { parseTags } from "@/lib/url";
-import { parseSourceParam } from "@/lib/validation";
+import {
+  parseDateParam,
+  parseSortParam,
+  parseSourceParam,
+} from "@/lib/validation";
 import { isPlainLeftClick } from "@/lib/mouse";
 
 export type Filters = {
@@ -7,17 +11,61 @@ export type Filters = {
   tags: string[];
   untagged: boolean;
   source: "text" | "voice" | null;
+  archived: boolean;
+  from: string | null;
+  to: string | null;
+  sort: "newest" | "oldest";
 };
 
 const URL_CHANGE_EVENT = "urlchange";
 const STREAM_CHANGED_EVENT = "streamchanged";
 
-export function readFilters(url: URL): Filters {
+// The SSR `initial` props for Sidebar/StreamView carry the active filter state
+// under these field names (`query` instead of `q`); both islands build their
+// reactive `Filters` from it, so the mapping lives here to avoid duplication.
+export type InitialFilters = {
+  query: string;
+  tags: string[];
+  untagged: boolean;
+  source: "text" | "voice" | null;
+  archived: boolean;
+  from: string | null;
+  to: string | null;
+  sort: "newest" | "oldest";
+};
+
+export function initialFilters(init: InitialFilters): Filters {
   return {
-    q: url.searchParams.get("q") ?? "",
-    tags: parseTags(url.searchParams.get("tags")),
-    untagged: url.searchParams.get("untagged") === "1",
-    source: parseSourceParam(url.searchParams.get("source")) ?? null,
+    q: init.query,
+    tags: init.tags,
+    untagged: init.untagged,
+    source: init.source,
+    archived: init.archived,
+    from: init.from,
+    to: init.to,
+    sort: init.sort,
+  };
+}
+
+type FilterExtras = Pick<Filters, "archived" | "from" | "to" | "sort">;
+
+function readExtras(p: URLSearchParams): FilterExtras {
+  return {
+    archived: p.get("archived") === "1",
+    from: parseDateParam(p.get("from")) ?? null,
+    to: parseDateParam(p.get("to")) ?? null,
+    sort: parseSortParam(p.get("sort")),
+  };
+}
+
+export function readFilters(url: URL): Filters {
+  const p = url.searchParams;
+  return {
+    q: p.get("q") ?? "",
+    tags: parseTags(p.get("tags")),
+    untagged: p.get("untagged") === "1",
+    source: parseSourceParam(p.get("source")) ?? null,
+    ...readExtras(p),
   };
 }
 
@@ -71,12 +119,20 @@ function setIfPresent(
   if (value) p.set(key, value);
 }
 
+function writeExtras(params: URLSearchParams, filters: Filters): void {
+  if (filters.archived) params.set("archived", "1");
+  setIfPresent(params, "from", filters.from);
+  setIfPresent(params, "to", filters.to);
+  if (filters.sort === "oldest") params.set("sort", "oldest");
+}
+
 export function filtersToSearch(filters: Filters): string {
   const params = new URLSearchParams();
   setIfPresent(params, "q", filters.q);
   if (filters.tags.length > 0) params.set("tags", filters.tags.join(","));
   if (filters.untagged) params.set("untagged", "1");
   setIfPresent(params, "source", filters.source);
+  writeExtras(params, filters);
   const s = params.toString();
   return s ? `?${s}` : "";
 }

@@ -10,10 +10,11 @@ import {
 } from "vue";
 import type { TagListEntry } from "@/lib/ideas";
 import type { TagsResponse } from "@/lib/api-types";
-import { setFlag, toggleTag } from "@/lib/url";
+import { isoDaysAgo, setDateFrom, setFlag, toggleTag } from "@/lib/url";
 import {
   applyURL,
   filtersToSearch,
+  initialFilters,
   interceptNav,
   notifyStreamChanged,
   subscribeFilters,
@@ -29,10 +30,16 @@ const props = defineProps<{
     totalIdeas: number;
     untaggedCount: number;
     voiceCount: number;
+    textCount: number;
+    archivedCount: number;
     query: string;
     tags: string[];
     untagged: boolean;
     source: "text" | "voice" | null;
+    archived: boolean;
+    from: string | null;
+    to: string | null;
+    sort: "newest" | "oldest";
   };
 }>();
 
@@ -40,12 +47,9 @@ const tagList = shallowRef<TagListEntry[]>(props.initial.tagList);
 const totalIdeas = ref(props.initial.totalIdeas);
 const untaggedCount = ref(props.initial.untaggedCount);
 const voiceCount = ref(props.initial.voiceCount);
-const filters = shallowRef<Filters>({
-  q: props.initial.query,
-  tags: props.initial.tags,
-  untagged: props.initial.untagged,
-  source: props.initial.source,
-});
+const textCount = ref(props.initial.textCount);
+const archivedCount = ref(props.initial.archivedCount);
+const filters = shallowRef<Filters>(initialFilters(props.initial));
 
 const showUnused = ref(false);
 const tagged = computed(() => tagList.value.filter((t) => t.count > 0));
@@ -60,15 +64,26 @@ function toggleUnused() {
   closePickerIfGone();
 }
 const activeTagSet = computed(() => new Set(filters.value.tags));
-const everythingActive = computed(
-  () =>
-    activeTagSet.value.size === 0 &&
-    !filters.value.q &&
-    !filters.value.untagged &&
-    !filters.value.source,
-);
+const everythingActive = computed(() => {
+  const f = filters.value;
+  return ![
+    activeTagSet.value.size > 0,
+    !!f.q,
+    f.untagged,
+    !!f.source,
+    f.archived,
+    !!f.from,
+    !!f.to,
+  ].some(Boolean);
+});
 const untaggedActive = computed(() => filters.value.untagged);
 const voiceActive = computed(() => filters.value.source === "voice");
+const textActive = computed(() => filters.value.source === "text");
+const archivedActive = computed(() => filters.value.archived);
+const recentFrom = computed(() => isoDaysAgo(7));
+const recentActive = computed(
+  () => filters.value.from === recentFrom.value && !filters.value.to,
+);
 
 const baseURL = computed(
   () => new URL(`/${filtersToSearch(filters.value)}`, "http://x"),
@@ -79,6 +94,15 @@ const untaggedHref = computed(() =>
 );
 const voiceHref = computed(() =>
   setFlag(baseURL.value, "source", voiceActive.value ? null : "voice"),
+);
+const textHref = computed(() =>
+  setFlag(baseURL.value, "source", textActive.value ? null : "text"),
+);
+const archivedHref = computed(() =>
+  setFlag(baseURL.value, "archived", archivedActive.value ? null : "1"),
+);
+const recentHref = computed(() =>
+  setDateFrom(baseURL.value, recentActive.value ? null : recentFrom.value),
 );
 function tagHref(name: string): string {
   return toggleTag(baseURL.value, name);
@@ -251,6 +275,8 @@ async function refetchTags(): Promise<void> {
     totalIdeas.value = data.totalIdeas;
     untaggedCount.value = data.untaggedCount;
     voiceCount.value = data.voiceCount;
+    textCount.value = data.textCount;
+    archivedCount.value = data.archivedCount;
     closePickerIfGone();
   } catch (err) {
     console.error("tags fetch failed", err);
@@ -309,6 +335,35 @@ onBeforeUnmount(() => {
           <span class="dot dot--outline"></span>
           <span class="label">voice only</span>
           <span class="num">{{ voiceCount }}</span>
+        </a>
+        <a
+          :class="'side-item' + (textActive ? ' active' : '')"
+          :href="textHref"
+          :aria-current="textActive ? 'page' : undefined"
+          @click="interceptNav($event, textHref)"
+        >
+          <span class="dot dot--outline"></span>
+          <span class="label">text only</span>
+          <span class="num">{{ textCount }}</span>
+        </a>
+        <a
+          :class="'side-item' + (recentActive ? ' active' : '')"
+          :href="recentHref"
+          :aria-current="recentActive ? 'page' : undefined"
+          @click="interceptNav($event, recentHref)"
+        >
+          <span class="dot dot--outline"></span>
+          <span class="label">last 7 days</span>
+        </a>
+        <a
+          :class="'side-item' + (archivedActive ? ' active' : '')"
+          :href="archivedHref"
+          :aria-current="archivedActive ? 'page' : undefined"
+          @click="interceptNav($event, archivedHref)"
+        >
+          <span class="dot dot--outline"></span>
+          <span class="label">archived</span>
+          <span class="num">{{ archivedCount }}</span>
         </a>
       </div>
 

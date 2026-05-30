@@ -1035,6 +1035,24 @@ body[data-theme="dark"] .theme-toggle .knob {
 .filter-strip .clear:hover {
   color: var(--ink);
 }
+.filter-strip .filter-sort {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 6px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.filter-strip .filter-sort:hover {
+  color: var(--ink);
+}
+/* When chips are present the .chips flex:1 already pushes sort+clear right. */
+.filter-strip .chips ~ .filter-sort {
+  margin-left: 0;
+}
 
 /* ---------- Day group ---------- */
 .day-group {
@@ -1230,6 +1248,26 @@ body[data-theme="dark"] .theme-toggle .knob {
   border-radius: 99px;
 }
 .entry-foot .source.voice {
+  color: var(--accent);
+}
+.entry-foot .entry-link,
+.entry-foot .entry-copy {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+.entry-foot .entry-link:hover,
+.entry-foot .entry-copy:hover {
+  color: var(--ink);
+}
+.entry-foot .entry-pinned {
   color: var(--accent);
 }
 

@@ -10,11 +10,17 @@ import {
   countIdeas,
   countUntagged,
   countVoice,
+  countTextOnly,
+  countArchived,
   type StreamFilters,
 } from "@/lib/ideas";
 import { issueNumber } from "@/lib/issueNumber";
 import { parseTags } from "@/lib/url";
-import { parseSourceParam } from "@/lib/validation";
+import {
+  parseDateParam,
+  parseSortParam,
+  parseSourceParam,
+} from "@/lib/validation";
 
 export const prerender = false;
 
@@ -25,26 +31,36 @@ if (!user) {
   );
 }
 
-const q = Astro.url.searchParams.get("q") ?? "";
-const activeTagNames = parseTags(Astro.url.searchParams.get("tags"));
-const untagged = Astro.url.searchParams.get("untagged") === "1";
-const source = parseSourceParam(Astro.url.searchParams.get("source")) ?? null;
+const sp = Astro.url.searchParams;
+const q = sp.get("q") ?? "";
+const activeTagNames = parseTags(sp.get("tags"));
+const untagged = sp.get("untagged") === "1";
+const source = parseSourceParam(sp.get("source")) ?? null;
+const archived = sp.get("archived") === "1";
+const from = parseDateParam(sp.get("from")) ?? null;
+const to = parseDateParam(sp.get("to")) ?? null;
+const sort = parseSortParam(sp.get("sort"));
 
 const filters: StreamFilters = {
   q,
   tags: activeTagNames,
   untagged,
   source: source ?? undefined,
+  archived,
+  from: from ?? undefined,
+  to: to ?? undefined,
+  sort,
 };
 
-const [ideas, tagList, totalIdeas, untaggedCount, voiceCount] =
-  await Promise.all([
-    listIdeas(user.id, filters),
-    listTagsWithCounts(user.id),
-    countIdeas(user.id),
-    countUntagged(user.id),
-    countVoice(user.id),
-  ]);
+const [ideas, tagList] = await Promise.all([
+  listIdeas(user.id, filters),
+  listTagsWithCounts(user.id),
+]);
+const totalIdeas = countIdeas(user.id);
+const untaggedCount = countUntagged(user.id);
+const voiceCount = countVoice(user.id);
+const textCount = countTextOnly(user.id);
+const archivedCount = countArchived(user.id);
 
 const visibleTagCount = tagList.filter((t) => t.count > 0).length;
 const suggestedTags = tagList
@@ -75,24 +91,31 @@ const now = new Date();
 const weekOf = `${MO[now.getMonth()]} ${now.getDate()}`;
 const issueNo = String(issueNumber()).padStart(3, "0");
 
+const filterState = {
+  query: q,
+  tags: activeTagNames,
+  untagged,
+  source,
+  archived,
+  from,
+  to,
+  sort,
+};
+
 const sidebarInitial = {
   tagList,
   totalIdeas,
   untaggedCount,
   voiceCount,
-  query: q,
-  tags: activeTagNames,
-  untagged,
-  source,
+  textCount,
+  archivedCount,
+  ...filterState,
 };
 
 const streamInitial = {
   ideas,
   activeTagHues,
-  query: q,
-  tags: activeTagNames,
-  untagged,
-  source,
+  ...filterState,
 };
 ---
 

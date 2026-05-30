@@ -16,12 +16,12 @@ if (!user) {
   return Astro.redirect("/login?next=/account");
 }
 
-const [totalIdeas, tagList, passkeys, sessions] = await Promise.all([
-  countIdeas(user.id),
+const [tagList, passkeys, sessions] = await Promise.all([
   listTagsWithCounts(user.id),
   listPasskeys(user.id),
   listSessions(user.id),
 ]);
+const totalIdeas = countIdeas(user.id);
 const visibleTagCount = tagList.filter((t) => t.count > 0).length;
 const currentSessionId = Astro.locals.session?.id ?? null;
 

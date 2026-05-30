@@ -1,10 +1,15 @@
 import {
   and,
+  asc,
   desc,
   eq,
   exists,
+  gte,
   inArray,
+  isNotNull,
+  isNull,
   like,
+  lt,
   sql,
   type SQL,
 } from "drizzle-orm";
@@ -22,6 +27,8 @@ export type IdeaWithTags = {
   body: string;
   source: "text" | "voice";
   createdAt: number;
+  archived: boolean;
+  pinned: boolean;
   tags: { name: string; hue: number }[];
 };
 
@@ -30,6 +37,10 @@ export type StreamFilters = {
   tags?: string[];
   untagged?: boolean;
   source?: "text" | "voice";
+  archived?: boolean;
+  from?: string;
+  to?: string;
+  sort?: "newest" | "oldest";
   limit?: number;
 };
 
@@ -163,6 +174,8 @@ export async function createIdeaWithTags(opts: {
       body: text,
       source: opts.source,
       createdAt: now,
+      archived: false,
+      pinned: false,
       tags: tagList,
     };
   });
@@ -182,7 +195,12 @@ export async function updateIdeaWithTags(opts: {
       .update(ideas)
       .set({ body: text, updatedAt: now })
       .where(and(eq(ideas.id, opts.ideaId), eq(ideas.userId, opts.userId)))
-      .returning({ source: ideas.source, createdAt: ideas.createdAt })
+      .returning({
+        source: ideas.source,
+        createdAt: ideas.createdAt,
+        archivedAt: ideas.archivedAt,
+        pinnedAt: ideas.pinnedAt,
+      })
       .all();
     const row = updated[0];
     if (!row) return null;
@@ -192,6 +210,8 @@ export async function updateIdeaWithTags(opts: {
       body: text,
       source: row.source as "text" | "voice",
       createdAt: row.createdAt,
+      archived: row.archivedAt !== null,
+      pinned: row.pinnedAt !== null,
       tags: tagList,
     };
   });
@@ -224,6 +244,26 @@ function untaggedClause(flag: boolean | undefined): SQL | null {
     : null;
 }
 
+// The default stream shows only live notes; `?archived=1` flips to the archive.
+function archivedClause(showArchived: boolean | undefined): SQL {
+  return showArchived ? isNotNull(ideas.archivedAt) : isNull(ideas.archivedAt);
+}
+
+// Inclusive `from` lower bound: notes created on or after UTC midnight of the day.
+function fromClause(from: string | undefined): SQL | null {
+  if (!from) return null;
+  const ms = Date.parse(`${from}T00:00:00.000Z`);
+  return Number.isNaN(ms) ? null : gte(ideas.createdAt, ms);
+}
+
+// Inclusive `to` upper bound: notes created before UTC midnight of the *next*
+// day, so the whole `to` calendar day is included.
+function toClause(to: string | undefined): SQL | null {
+  if (!to) return null;
+  const ms = Date.parse(`${to}T00:00:00.000Z`);
+  return Number.isNaN(ms) ? null : lt(ideas.createdAt, ms + 86_400_000);
+}
+
 function tagExistsClause(userId: string, name: string): SQL {
   return exists(
     db
@@ -245,11 +285,26 @@ function buildIdeaFilters(userId: string, filters: StreamFilters): SQL[] {
     searchClause(filters.q),
     sourceClause(filters.source),
     untaggedClause(filters.untagged),
+    fromClause(filters.from),
+    toClause(filters.to),
   ].filter((c): c is SQL => c !== null);
   const tagClauses = (filters.tags ?? []).map((name) =>
     tagExistsClause(userId, name),
   );
-  return [eq(ideas.userId, userId), ...optional, ...tagClauses];
+  return [
+    eq(ideas.userId, userId),
+    archivedClause(filters.archived),
+    ...optional,
+    ...tagClauses,
+  ];
+}
+
+// Pinned notes float to the top regardless of sort direction; within each band
+// (pinned / unpinned) the chosen sort orders by creation time.
+function ideaOrderBy(sort: "newest" | "oldest" | undefined): SQL[] {
+  const byTime =
+    sort === "oldest" ? asc(ideas.createdAt) : desc(ideas.createdAt);
+  return [desc(ideas.pinnedAt), byTime];
 }
 
 async function loadTagsForIdeas(
@@ -285,10 +340,12 @@ export async function listIdeas(
       body: ideas.body,
       source: ideas.source,
       createdAt: ideas.createdAt,
+      archivedAt: ideas.archivedAt,
+      pinnedAt: ideas.pinnedAt,
     })
     .from(ideas)
     .where(and(...buildIdeaFilters(userId, filters)))
-    .orderBy(desc(ideas.createdAt))
+    .orderBy(...ideaOrderBy(filters.sort))
     .limit(filters.limit ?? 200);
 
   const byIdea = await loadTagsForIdeas(rows.map((r) => r.id));
@@ -298,8 +355,75 @@ export async function listIdeas(
     body: r.body,
     source: r.source as "text" | "voice",
     createdAt: r.createdAt,
+    archived: r.archivedAt !== null,
+    pinned: r.pinnedAt !== null,
     tags: byIdea.get(r.id) ?? [],
   }));
+}
+
+// Fetch a single owned note for the permalink/detail view. Returns null when
+// the id doesn't exist OR belongs to another user (the route 404s on null, so
+// foreign notes are indistinguishable from missing ones — no ownership leak).
+export async function getIdeaById(
+  userId: string,
+  ideaId: string,
+): Promise<IdeaWithTags | null> {
+  const row = db
+    .select({
+      id: ideas.id,
+      body: ideas.body,
+      source: ideas.source,
+      createdAt: ideas.createdAt,
+      archivedAt: ideas.archivedAt,
+      pinnedAt: ideas.pinnedAt,
+    })
+    .from(ideas)
+    .where(and(eq(ideas.id, ideaId), eq(ideas.userId, userId)))
+    .get();
+  if (!row) return null;
+  const byIdea = await loadTagsForIdeas([row.id]);
+  return {
+    id: row.id,
+    body: row.body,
+    source: row.source as "text" | "voice",
+    createdAt: row.createdAt,
+    archived: row.archivedAt !== null,
+    pinned: row.pinnedAt !== null,
+    tags: byIdea.get(row.id) ?? [],
+  };
+}
+
+// A flag-to-timestamp column: present-and-true → now, present-and-false → NULL,
+// absent → omitted (column untouched).
+function stampColumn(
+  set: Record<string, number | null>,
+  key: string,
+  flag: boolean | undefined,
+  now: number,
+): void {
+  if (flag === undefined) return;
+  set[key] = flag ? now : null;
+}
+
+// Toggle archive and/or pin state for one owned note. Each field is a timestamp
+// when set, NULL when cleared; only the fields present in `patch` are touched.
+// Returns false when the note doesn't exist or isn't owned by the user.
+export async function setIdeaState(
+  userId: string,
+  ideaId: string,
+  patch: { archived?: boolean; pinned?: boolean },
+): Promise<boolean> {
+  const now = Date.now();
+  const set: Record<string, number | null> = {};
+  stampColumn(set, "archivedAt", patch.archived, now);
+  stampColumn(set, "pinnedAt", patch.pinned, now);
+  const updated = db
+    .update(ideas)
+    .set(set)
+    .where(and(eq(ideas.id, ideaId), eq(ideas.userId, userId)))
+    .returning({ id: ideas.id })
+    .all();
+  return updated.length > 0;
 }
 
 export async function getTagHues(
@@ -316,15 +440,21 @@ export async function getTagHues(
 export async function listTagsWithCounts(
   userId: string,
 ): Promise<TagListEntry[]> {
+  // Count only links to live (non-archived) notes so a tag used solely on
+  // archived notes drops to 0 and hides, matching the default stream.
   const rows = await db
     .select({
       id: tags.id,
       name: tags.name,
       hue: tags.hue,
-      count: sql<number>`COUNT(${ideaTags.ideaId})`,
+      count: sql<number>`COUNT(${ideas.id})`,
     })
     .from(tags)
     .leftJoin(ideaTags, eq(ideaTags.tagId, tags.id))
+    .leftJoin(
+      ideas,
+      and(eq(ideas.id, ideaTags.ideaId), isNull(ideas.archivedAt)),
+    )
     .where(eq(tags.userId, userId))
     .groupBy(tags.id);
 
@@ -332,36 +462,40 @@ export async function listTagsWithCounts(
   return rows;
 }
 
-export async function countIdeas(userId: string): Promise<number> {
+// COUNT(*) of the user's ideas matching `extra` (a clause appended to the
+// owner predicate). Shared by every sidebar counter so each stays one line.
+function countWhere(userId: string, extra: SQL): number {
   const row = db
     .select({ n: sql<number>`COUNT(*)` })
     .from(ideas)
-    .where(eq(ideas.userId, userId))
+    .where(and(eq(ideas.userId, userId), extra))
     .get();
   return row?.n ?? 0;
 }
 
-export async function countUntagged(userId: string): Promise<number> {
-  const row = db
-    .select({ n: sql<number>`COUNT(*)` })
-    .from(ideas)
-    .where(
-      and(
-        eq(ideas.userId, userId),
-        sql`NOT EXISTS (SELECT 1 FROM ${ideaTags} WHERE ${ideaTags.ideaId} = ${ideas.id})`,
-      ),
-    )
-    .get();
-  return row?.n ?? 0;
+const NOT_ARCHIVED = isNull(ideas.archivedAt);
+const HAS_NO_TAGS = sql`NOT EXISTS (SELECT 1 FROM ${ideaTags} WHERE ${ideaTags.ideaId} = ${ideas.id})`;
+
+// All sidebar counters describe the live (non-archived) stream, so each one
+// pins `archivedAt IS NULL`. The archive has its own counter (countArchived).
+export function countIdeas(userId: string): number {
+  return countWhere(userId, NOT_ARCHIVED);
 }
 
-export async function countVoice(userId: string): Promise<number> {
-  const row = db
-    .select({ n: sql<number>`COUNT(*)` })
-    .from(ideas)
-    .where(and(eq(ideas.userId, userId), eq(ideas.source, "voice")))
-    .get();
-  return row?.n ?? 0;
+export function countUntagged(userId: string): number {
+  return countWhere(userId, and(NOT_ARCHIVED, HAS_NO_TAGS)!);
+}
+
+export function countVoice(userId: string): number {
+  return countWhere(userId, and(NOT_ARCHIVED, eq(ideas.source, "voice"))!);
+}
+
+export function countTextOnly(userId: string): number {
+  return countWhere(userId, and(NOT_ARCHIVED, eq(ideas.source, "text"))!);
+}
+
+export function countArchived(userId: string): number {
+  return countWhere(userId, isNotNull(ideas.archivedAt));
 }
 
 export type TagRow = typeof tags.$inferSelect;

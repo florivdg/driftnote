@@ -6,6 +6,7 @@ import { groupByDay } from "@/lib/time";
 import {
   currentFilters,
   filtersToSearch,
+  initialFilters,
   subscribeFilters,
   subscribeStreamChanged,
   type Filters,
@@ -23,6 +24,10 @@ const props = defineProps<{
     tags: string[];
     untagged: boolean;
     source: "text" | "voice" | null;
+    archived: boolean;
+    from: string | null;
+    to: string | null;
+    sort: "newest" | "oldest";
   };
 }>();
 
@@ -30,12 +35,7 @@ const ideas = shallowRef<IdeaWithTags[]>(props.initial.ideas);
 const activeTagHues = shallowRef<{ name: string; hue: number }[]>(
   props.initial.activeTagHues,
 );
-const filters = shallowRef<Filters>({
-  q: props.initial.query,
-  tags: props.initial.tags,
-  untagged: props.initial.untagged,
-  source: props.initial.source,
-});
+const filters = shallowRef<Filters>(initialFilters(props.initial));
 
 const groups = computed(() => groupByDay(ideas.value));
 
@@ -107,6 +107,10 @@ onBeforeUnmount(() => {
     :query="filters.q"
     :untagged="filters.untagged"
     :source="filters.source"
+    :archived="filters.archived"
+    :from="filters.from"
+    :to="filters.to"
+    :sort="filters.sort"
   />
   <div v-if="ideas.length === 0" class="stream-empty">
     <h2>Nothing here.</h2>
