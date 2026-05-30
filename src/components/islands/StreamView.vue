@@ -19,7 +19,15 @@ import IdeaCard from "@/components/vue/IdeaCard.vue";
 import UndoToast from "@/components/vue/UndoToast.vue";
 
 function isFilterActive(f: Filters): boolean {
-  return f.q !== "" || f.tags.length > 0 || f.untagged || f.source !== null;
+  return (
+    f.q !== "" ||
+    f.tags.length > 0 ||
+    f.untagged ||
+    f.source !== null ||
+    f.archived ||
+    f.from !== null ||
+    f.to !== null
+  );
 }
 
 const props = defineProps<{
@@ -141,7 +149,6 @@ onBeforeUnmount(() => {
       <li><kbd>#</kbd> prefix a word to tag it</li>
       <li><kbd>⌘↵</kbd> to save from the keyboard</li>
       <li><kbd>/</kbd> to jump to search</li>
-      <li><kbd>M</kbd> to record voice</li>
     </ul>
   </div>
   <template v-else>
