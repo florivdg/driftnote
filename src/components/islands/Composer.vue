@@ -1,18 +1,63 @@
 <script setup lang="ts">
-import { computed, ref, useTemplateRef, watch } from "vue";
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  useTemplateRef,
+  watch,
+} from "vue";
 import { extractTags } from "@/lib/tags";
-import { isSaveHotkey } from "@/lib/keyboard";
+import { isPlainHotkey, isSaveHotkey } from "@/lib/keyboard";
 import { notifyStreamChanged } from "@/lib/url-state";
+import {
+  WAVE_BARS,
+  VoiceRecorder,
+  describeMicError,
+  micUnsupportedReason,
+} from "@/lib/voice-recorder";
+import {
+  blobToPcm16k,
+  readVoiceLang,
+  transcribe,
+  writeVoiceLang,
+} from "@/lib/voice";
+import type { VoiceLang } from "@/lib/voice";
 
 const props = defineProps<{
   suggested: string[];
 }>();
 
+type VoicePhase = "idle" | "recording" | "loading" | "transcribing";
+
 const text = ref("");
 const submitting = ref(false);
+const phase = ref<VoicePhase>("idle");
+const elapsed = ref(0);
+const levels = ref<number[]>(Array.from({ length: WAVE_BARS }, () => 0));
+const downloadPct = ref(0);
+const voiceError = ref("");
+const lang = ref<VoiceLang>("auto");
+const sourceForNextSubmit = ref<"text" | "voice">("text");
+const statusMsg = ref("");
 const ta = useTemplateRef<HTMLTextAreaElement>("ta");
 
+let recorder: VoiceRecorder | null = null;
+let recTimer: ReturnType<typeof setInterval> | null = null;
+
+const recording = computed(() => phase.value !== "idle");
+const MIC_LABELS: Record<VoicePhase, string> = {
+  idle: "Record voice",
+  recording: "Stop recording",
+  loading: "Loading transcription model",
+  transcribing: "Transcribing",
+};
+const micLabel = computed(() => MIC_LABELS[phase.value]);
 const tags = computed(() => extractTags(text.value));
+const mmss = computed(() => {
+  const e = elapsed.value;
+  return `${String(Math.floor(e / 60)).padStart(2, "0")}:${String(e % 60).padStart(2, "0")}`;
+});
 
 watch(text, () => {
   const el = ta.value;
@@ -21,11 +66,103 @@ watch(text, () => {
   el.style.height = Math.min(240, el.scrollHeight) + "px";
 });
 
-async function postIdea(body: string): Promise<void> {
+watch(lang, (value) => writeVoiceLang(value));
+
+function clearRecTimer(): void {
+  if (recTimer) {
+    clearInterval(recTimer);
+    recTimer = null;
+  }
+}
+
+function resetVoiceState(): void {
+  clearRecTimer();
+  elapsed.value = 0;
+  downloadPct.value = 0;
+  levels.value = levels.value.map(() => 0);
+}
+
+function failVoice(message: string): void {
+  recorder = null;
+  voiceError.value = message;
+  statusMsg.value = message;
+}
+
+async function startRecording(): Promise<void> {
+  voiceError.value = "";
+  const unsupported = micUnsupportedReason();
+  if (unsupported) {
+    failVoice(unsupported);
+    return;
+  }
+  recorder = new VoiceRecorder({ onLevels: (l) => (levels.value = l) });
+  try {
+    await recorder.start();
+  } catch (err) {
+    failVoice(describeMicError(err));
+    return;
+  }
+  phase.value = "recording";
+  elapsed.value = 0;
+  statusMsg.value = "Listening for voice input.";
+  recTimer = setInterval(() => (elapsed.value += 1), 1000);
+}
+
+async function toggleRecording(): Promise<void> {
+  if (phase.value === "idle") await startRecording();
+  else if (phase.value === "recording") await stopRecording();
+}
+
+function appendTranscript(transcript: string): void {
+  if (!transcript) return;
+  text.value = (text.value ? text.value + " " : "") + transcript;
+  sourceForNextSubmit.value = "voice";
+}
+
+async function stopRecording(): Promise<void> {
+  clearRecTimer();
+  if (!recorder) {
+    phase.value = "idle";
+    return;
+  }
+  const blob = await recorder.stop();
+  recorder = null;
+  await runTranscription(blob);
+}
+
+async function runTranscription(blob: Blob): Promise<void> {
+  phase.value = "loading";
+  statusMsg.value = "Preparing transcription model.";
+  try {
+    const pcm = await blobToPcm16k(blob);
+    phase.value = "transcribing";
+    statusMsg.value = "Transcribing your voice memo.";
+    const transcript = await transcribe(
+      pcm,
+      lang.value,
+      (pct) => (downloadPct.value = pct),
+    );
+    appendTranscript(transcript);
+    statusMsg.value = transcript
+      ? "Voice transcript ready."
+      : "No speech detected.";
+    if (!transcript) voiceError.value = "No speech detected. Try again.";
+  } catch (err) {
+    console.error(err);
+    voiceError.value = "Transcription failed. Try again.";
+    statusMsg.value = voiceError.value;
+  } finally {
+    resetVoiceState();
+    phase.value = "idle";
+    ta.value?.focus();
+  }
+}
+
+async function postIdea(body: string, source: "text" | "voice"): Promise<void> {
   const res = await fetch("/api/ideas", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ text: body, source: "text" }),
+    body: JSON.stringify({ text: body, source }),
   });
   if (!res.ok) throw new Error(`POST /api/ideas failed: ${res.status}`);
 }
@@ -35,8 +172,9 @@ async function submit() {
   if (!body || submitting.value) return;
   submitting.value = true;
   try {
-    await postIdea(body);
+    await postIdea(body, sourceForNextSubmit.value);
     text.value = "";
+    sourceForNextSubmit.value = "text";
     notifyStreamChanged();
   } catch (err) {
     console.error(err);
@@ -52,15 +190,33 @@ function onKeyDown(e: KeyboardEvent) {
   }
 }
 
+function onGlobalKey(e: KeyboardEvent) {
+  if (!isPlainHotkey(e, "m")) return;
+  e.preventDefault();
+  void toggleRecording();
+}
+
 function addSuggestion(t: string) {
   if (tags.value.includes(t)) return;
   text.value = (text.value.trimEnd() + " #" + t + " ").replace(/^ +/, "");
   ta.value?.focus();
 }
+
+onMounted(() => {
+  lang.value = readVoiceLang();
+  window.addEventListener("keydown", onGlobalKey);
+});
+
+onBeforeUnmount(() => {
+  clearRecTimer();
+  recorder?.abort();
+  window.removeEventListener("keydown", onGlobalKey);
+});
 </script>
 
 <template>
   <div class="composer">
+    <span class="visually-hidden" aria-live="polite">{{ statusMsg }}</span>
     <div class="composer-body">
       <textarea
         ref="ta"
@@ -72,7 +228,60 @@ function addSuggestion(t: string) {
       ></textarea>
     </div>
 
-    <div v-if="tags.length > 0" class="composer-tags">
+    <template v-if="recording">
+      <div class="voice-transcript">
+        <template v-if="phase === 'loading'">
+          Loading model… {{ downloadPct }}%
+        </template>
+        <template v-else-if="phase === 'transcribing'">
+          Transcribing…
+        </template>
+        <template v-else> Listening… </template>
+        <span class="cursor"></span>
+      </div>
+      <div class="voice-panel">
+        <div class="voice-wave" data-testid="voice-wave">
+          <span
+            v-for="(level, i) in levels"
+            :key="i"
+            :style="{
+              height: Math.max(3, Math.round(level * 28)) + 'px',
+              animation: 'none',
+            }"
+          ></span>
+        </div>
+        <span class="voice-time">{{ mmss }}</span>
+        <button
+          class="btn"
+          type="button"
+          :disabled="phase !== 'recording'"
+          data-testid="voice-stop"
+          @click="stopRecording"
+        >
+          <svg
+            width="11"
+            height="11"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <rect x="6" y="6" width="12" height="12" rx="2" />
+          </svg>
+          Stop &amp; save
+        </button>
+      </div>
+    </template>
+
+    <p
+      v-if="voiceError"
+      class="voice-error"
+      role="alert"
+      data-testid="voice-error"
+    >
+      {{ voiceError }}
+    </p>
+
+    <div v-if="!recording && tags.length > 0" class="composer-tags">
       <span v-for="t in tags" :key="t" class="chip">
         <span class="chip-mark"></span>
         <span>{{ t }}</span>
@@ -80,7 +289,12 @@ function addSuggestion(t: string) {
     </div>
 
     <div
-      v-if="tags.length === 0 && suggested.length > 0 && text.length > 0"
+      v-if="
+        !recording &&
+        tags.length === 0 &&
+        suggested.length > 0 &&
+        text.length > 0
+      "
       class="composer-tags"
     >
       <span class="composer-add-label">Add →</span>
@@ -97,10 +311,49 @@ function addSuggestion(t: string) {
     </div>
 
     <div class="composer-bar">
+      <button
+        :class="['mic-btn', phase === 'recording' && 'recording']"
+        type="button"
+        :disabled="phase === 'loading' || phase === 'transcribing'"
+        :title="micLabel"
+        :aria-label="micLabel"
+        :aria-pressed="phase === 'recording'"
+        data-testid="mic-btn"
+        @click="toggleRecording"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="9" y="3" width="6" height="12" rx="3" />
+          <path d="M5 11a7 7 0 0 0 14 0" />
+          <path d="M12 18v3" />
+        </svg>
+      </button>
+      <label class="voice-lang" title="Transcription language">
+        <span class="visually-hidden">Transcription language</span>
+        <select v-model="lang" data-testid="voice-lang">
+          <option value="auto">Auto</option>
+          <option value="english">EN</option>
+          <option value="german">DE</option>
+        </select>
+      </label>
       <span class="hint">
-        <kbd>#</kbd> to tag · <kbd>⌘</kbd><kbd>↵</kbd> to save
+        <span v-if="recording" class="hot">Listening · speak naturally</span>
+        <template v-else>
+          <kbd>#</kbd> to tag · <kbd>⌘</kbd><kbd>↵</kbd> to save ·
+          <kbd>M</kbd> to talk
+        </template>
       </span>
       <button
+        v-if="!recording"
         class="btn btn-primary"
         type="button"
         :disabled="!text.trim() || submitting"

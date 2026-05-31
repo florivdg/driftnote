@@ -386,10 +386,10 @@ onBeforeUnmount(() => {
       <span v-if="idea.pinned" class="entry-pinned" title="Pinned">pinned</span>
       <span v-if="idea.pinned" class="dot-sep"></span>
       <span>{{ timeLabel }}</span>
-      <template v-if="idea.source !== 'voice'">
-        <span class="dot-sep"></span>
-        <span class="source">typed</span>
-      </template>
+      <span class="dot-sep"></span>
+      <span :class="'source ' + (idea.source === 'voice' ? 'voice' : '')">
+        {{ idea.source === "voice" ? "voice" : "typed" }}
+      </span>
       <span class="dot-sep"></span>
       <a class="entry-link" :href="permalink" title="Open permalink"> link </a>
       <span class="dot-sep"></span>
