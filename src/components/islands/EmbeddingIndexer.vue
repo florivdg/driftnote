@@ -18,6 +18,14 @@ import { contentHash } from "@/lib/content-hash";
 type PendingNote = { id: string; body: string };
 type Embedder = (text: string) => Promise<number[]>;
 
+// The server write gate allows 30 PUTs / 10s. Space uploads at least this far
+// apart (10s / 30 + margin) so a fast WebGPU backfill of many notes never trips
+// the limit; on a slow CPU the embed step already paces us, so this is a no-op.
+const MIN_UPLOAD_SPACING_MS = 380;
+// Fallback backoff if a 429 ever slips through without a usable Retry-After.
+const DEFAULT_BACKOFF_MS = 11_000;
+const MAX_UPLOAD_RETRIES = 5;
+
 const indexed = ref(0);
 const failed = ref(false);
 
@@ -26,6 +34,19 @@ const failed = ref(false);
 let running = false;
 let rerun = false;
 let embedder: Embedder | null = null;
+// Timestamp of the last upload, so we can space the next one out.
+let lastUploadAt = 0;
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+// Block until at least MIN_UPLOAD_SPACING_MS has elapsed since the previous
+// upload, keeping the sustained PUT rate under the server's write gate.
+async function pace(): Promise<void> {
+  const wait = lastUploadAt + MIN_UPLOAD_SPACING_MS - Date.now();
+  if (wait > 0) await sleep(wait);
+  lastUploadAt = Date.now();
+}
 
 // Load the active model once (cached in the worker) and return a function that
 // turns a note body into its normalized document vector. Lazily built on first
@@ -69,22 +90,49 @@ async function fetchPending(model: string): Promise<PendingNote[]> {
   return json.pending;
 }
 
+function uploadBody(
+  note: PendingNote,
+  model: string,
+  vector: number[],
+): string {
+  return JSON.stringify({
+    model,
+    dim: vector.length,
+    vector: toBase64(vector),
+    contentHash: contentHash(note.body),
+  });
+}
+
+// Honor the server's `retry-after` (seconds) on a 429, falling back to a fixed
+// window so the next attempt lands in a fresh rate-limit bucket.
+function backoffMs(res: Response): number {
+  const header = Number(res.headers.get("retry-after"));
+  return Number.isFinite(header) && header > 0
+    ? header * 1000 + 250
+    : DEFAULT_BACKOFF_MS;
+}
+
+// PUT one vector, paced under the write gate. A 429 isn't fatal: wait out the
+// limiter (Retry-After) and retry the same note, up to a bounded number of
+// times, so a fresh-vault backfill of >30 notes drains instead of stalling.
 async function uploadEmbedding(
   note: PendingNote,
   model: string,
   vector: number[],
 ): Promise<void> {
-  const res = await fetch(`/api/ideas/${note.id}/embedding`, {
-    method: "PUT",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      model,
-      dim: vector.length,
-      vector: toBase64(vector),
-      contentHash: contentHash(note.body),
-    }),
-  });
-  if (!res.ok) throw new Error(`upload failed: ${res.status}`);
+  const payload = uploadBody(note, model, vector);
+  for (let attempt = 0; attempt <= MAX_UPLOAD_RETRIES; attempt++) {
+    await pace();
+    const res = await fetch(`/api/ideas/${note.id}/embedding`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: payload,
+    });
+    if (res.ok) return;
+    if (res.status !== 429) throw new Error(`upload failed: ${res.status}`);
+    await sleep(backoffMs(res));
+  }
+  throw new Error(`upload failed: 429 after ${MAX_UPLOAD_RETRIES} retries`);
 }
 
 async function embedNote(

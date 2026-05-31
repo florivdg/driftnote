@@ -112,42 +112,57 @@ export function pendingForModel(
   return pending;
 }
 
-// Load the user's stored vectors for one model. The target note is excluded so
-// it can't be its own top result. Used by the KNN scan below.
-function loadVectors(
+// Load the user's stored vectors for one model, joined to each note's CURRENT
+// body so the caller can drop stale rows. A vector is fresh only when its stored
+// `contentHash` still matches a fresh hash of the live body; a row left stale by
+// an edit or a server-side tag-rewrite is excluded so KNN never ranks from an
+// outdated vector (the indexer re-embeds it on its next sweep). The target note
+// is filtered out by the caller so it can't be its own top result.
+function loadFreshVectors(
   userId: string,
   model: string,
 ): { id: string; vector: Float32Array }[] {
   const rows = db
-    .select({ id: ideaEmbedding.ideaId, vector: ideaEmbedding.vector })
+    .select({
+      id: ideaEmbedding.ideaId,
+      vector: ideaEmbedding.vector,
+      storedHash: ideaEmbedding.contentHash,
+      body: ideas.body,
+    })
     .from(ideaEmbedding)
     .innerJoin(ideas, eq(ideas.id, ideaEmbedding.ideaId))
     .where(and(eq(ideas.userId, userId), eq(ideaEmbedding.model, model)))
     .all();
-  return rows.map((r) => ({
-    id: r.id,
-    vector: decodeVector(r.vector as Buffer),
-  }));
+  return rows
+    .filter((r) => r.storedHash === contentHash(r.body))
+    .map((r) => ({ id: r.id, vector: decodeVector(r.vector as Buffer) }));
 }
 
 // Brute-force cosine KNN: load the target note's stored vector, score every
-// other same-model vector by dot product (== cosine, since all are normalized),
-// and return the top-k by score. Returns [] when the target has no embedding
-// yet (e.g. not backfilled), so callers render an empty "related" list.
+// other FRESH same-model vector by dot product (== cosine, since all are
+// normalized), and return the top-k by score. Returns [] when the target has no
+// embedding yet OR its stored vector is stale (the body changed since it was
+// embedded), so callers never rank from an outdated vector and render an empty
+// "related" list until the indexer catches up.
 export function relatedFor(
   userId: string,
   ideaId: string,
   k: number,
 ): RelatedNote[] {
   const target = db
-    .select({ vector: ideaEmbedding.vector, model: ideaEmbedding.model })
+    .select({
+      vector: ideaEmbedding.vector,
+      model: ideaEmbedding.model,
+      storedHash: ideaEmbedding.contentHash,
+      body: ideas.body,
+    })
     .from(ideaEmbedding)
     .innerJoin(ideas, eq(ideas.id, ideaEmbedding.ideaId))
     .where(and(eq(ideas.userId, userId), eq(ideaEmbedding.ideaId, ideaId)))
     .get();
-  if (!target) return [];
+  if (!target || target.storedHash !== contentHash(target.body)) return [];
   const query = decodeVector(target.vector as Buffer);
-  const scored = loadVectors(userId, target.model)
+  const scored = loadFreshVectors(userId, target.model)
     .filter((row) => row.id !== ideaId && row.vector.length === query.length)
     .map((row) => ({ id: row.id, score: dot(query, row.vector) }));
   scored.sort((a, b) => b.score - a.score);
