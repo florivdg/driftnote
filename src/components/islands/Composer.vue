@@ -10,7 +10,12 @@ import {
 import { extractTags } from "@/lib/tags";
 import { isPlainHotkey, isSaveHotkey } from "@/lib/keyboard";
 import { notifyStreamChanged } from "@/lib/url-state";
-import { WAVE_BARS, VoiceRecorder } from "@/lib/voice-recorder";
+import {
+  WAVE_BARS,
+  VoiceRecorder,
+  describeMicError,
+  micUnsupportedReason,
+} from "@/lib/voice-recorder";
 import {
   blobToPcm16k,
   readVoiceLang,
@@ -41,6 +46,13 @@ let recorder: VoiceRecorder | null = null;
 let recTimer: ReturnType<typeof setInterval> | null = null;
 
 const recording = computed(() => phase.value !== "idle");
+const MIC_LABELS: Record<VoicePhase, string> = {
+  idle: "Record voice",
+  recording: "Stop recording",
+  loading: "Loading transcription model",
+  transcribing: "Transcribing",
+};
+const micLabel = computed(() => MIC_LABELS[phase.value]);
 const tags = computed(() => extractTags(text.value));
 const mmss = computed(() => {
   const e = elapsed.value;
@@ -70,15 +82,24 @@ function resetVoiceState(): void {
   levels.value = levels.value.map(() => 0);
 }
 
+function failVoice(message: string): void {
+  recorder = null;
+  voiceError.value = message;
+  statusMsg.value = message;
+}
+
 async function startRecording(): Promise<void> {
   voiceError.value = "";
+  const unsupported = micUnsupportedReason();
+  if (unsupported) {
+    failVoice(unsupported);
+    return;
+  }
   recorder = new VoiceRecorder({ onLevels: (l) => (levels.value = l) });
   try {
     await recorder.start();
-  } catch {
-    recorder = null;
-    voiceError.value = "Microphone permission denied.";
-    statusMsg.value = voiceError.value;
+  } catch (err) {
+    failVoice(describeMicError(err));
     return;
   }
   phase.value = "recording";
@@ -249,10 +270,16 @@ onBeforeUnmount(() => {
           Stop &amp; save
         </button>
       </div>
-      <p v-if="voiceError" class="voice-error" data-testid="voice-error">
-        {{ voiceError }}
-      </p>
     </template>
+
+    <p
+      v-if="voiceError"
+      class="voice-error"
+      role="alert"
+      data-testid="voice-error"
+    >
+      {{ voiceError }}
+    </p>
 
     <div v-if="!recording && tags.length > 0" class="composer-tags">
       <span v-for="t in tags" :key="t" class="chip">
@@ -288,7 +315,9 @@ onBeforeUnmount(() => {
         :class="['mic-btn', phase === 'recording' && 'recording']"
         type="button"
         :disabled="phase === 'loading' || phase === 'transcribing'"
-        :title="recording ? 'Stop recording' : 'Record voice'"
+        :title="micLabel"
+        :aria-label="micLabel"
+        :aria-pressed="phase === 'recording'"
         data-testid="mic-btn"
         @click="toggleRecording"
       >

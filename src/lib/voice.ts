@@ -33,13 +33,22 @@ export function readVoiceModel(): string {
   return localStorage.getItem(VOICE_MODEL_KEY) || DEFAULT_VOICE_MODEL;
 }
 
+// A valid dtype map is a plain (non-array) object whose values are all strings,
+// e.g. { encoder_model: "fp16", decoder_model_merged: "q4" }.
+function isDtypeMap(value: unknown): value is Record<string, string> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  return Object.values(value).every((v) => typeof v === "string");
+}
+
 // A bare string like "q8" is a valid dtype; a JSON object is a per-module map.
+// Anything malformed (array, non-string values, bad JSON) falls back to the
+// raw string so an invalid override can't reach Transformers.js.
 function parseDtype(raw: string): string | Record<string, string> {
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (parsed && typeof parsed === "object") {
-      return parsed as Record<string, string>;
-    }
+    if (isDtypeMap(parsed)) return parsed;
   } catch {
     // Not JSON — treat the raw value as a single dtype string.
   }
