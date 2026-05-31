@@ -218,6 +218,97 @@ export async function parseAccountPatchBody(
   return { ok: true, value: { name } };
 }
 
+export type EmbeddingUpsert = {
+  model: string;
+  dim: number;
+  vector: Buffer;
+  contentHash: string;
+};
+
+// A model id / content hash is a short, non-empty string. The vector is a
+// base64-encoded packed Float32 BLOB whose byte length must be exactly dim*4.
+const MAX_EMBED_DIM = 4096;
+
+function badEmbed(message: string): ParsedOr<never> {
+  return { ok: false, res: new Response(message, { status: 400 }) };
+}
+
+function validShortString(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const s = v.trim();
+  return s.length > 0 && s.length <= 256 ? s : null;
+}
+
+function isInBounds(v: number): boolean {
+  return v > 0 && v <= MAX_EMBED_DIM;
+}
+
+function validDim(v: unknown): number | null {
+  if (typeof v !== "number" || !Number.isInteger(v)) return null;
+  return isInBounds(v) ? v : null;
+}
+
+// Decode the base64 vector and confirm its byte length matches dim*4 (one
+// Float32 per dimension), so a malformed or mismatched payload is rejected
+// before it reaches storage.
+function decodeVectorPayload(v: unknown, dim: number): Buffer | null {
+  if (typeof v !== "string") return null;
+  try {
+    const buf = Buffer.from(v, "base64");
+    return buf.byteLength === dim * 4 ? buf : null;
+  } catch {
+    return null;
+  }
+}
+
+type RawEmbedding = {
+  model?: unknown;
+  dim?: unknown;
+  vector?: unknown;
+  contentHash?: unknown;
+};
+
+// Validate the model + dim pair, the gate for decoding the vector (the byte
+// length must equal dim*4). Kept separate so each validator stays under the
+// complexity threshold.
+function validModelDim(p: RawEmbedding): { model: string; dim: number } | null {
+  const model = validShortString(p.model);
+  const dim = validDim(p.dim);
+  return model !== null && dim !== null ? { model, dim } : null;
+}
+
+// Validate and coerce the four embedding fields. Splitting this out of the
+// public parser keeps each function under the complexity gate: this one owns
+// the field checks, the parser owns only the read-JSON + assemble flow.
+function validateEmbeddingFields(p: RawEmbedding): ParsedOr<EmbeddingUpsert> {
+  const md = validModelDim(p);
+  if (md === null) return badEmbed("invalid model or dim");
+  const vector = decodeVectorPayload(p.vector, md.dim);
+  const contentHash = validShortString(p.contentHash);
+  if (vector === null || contentHash === null) {
+    return badEmbed("invalid vector or contentHash");
+  }
+  return { ok: true, value: { ...md, vector, contentHash } };
+}
+
+export async function parseEmbeddingBody(
+  req: Request,
+): Promise<ParsedOr<EmbeddingUpsert>> {
+  const parsed = await readJson(req);
+  if (!parsed.ok) return parsed;
+  return validateEmbeddingFields(parsed.value as RawEmbedding);
+}
+
+export function parsePositiveInt(
+  v: string | null,
+  fallback: number,
+  max: number,
+): number {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 1) return fallback;
+  return Math.min(n, max);
+}
+
 export function parseSourceParam(
   v: string | null,
 ): "text" | "voice" | undefined {

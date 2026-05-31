@@ -4,6 +4,7 @@ import Masthead from "@/components/Masthead.astro";
 import Sidebar from "@/components/islands/Sidebar.vue";
 import StreamView from "@/components/islands/StreamView.vue";
 import Composer from "@/components/islands/Composer.vue";
+import EmbeddingIndexer from "@/components/islands/EmbeddingIndexer.vue";
 import {
   listIdeas,
   listTagsWithCounts,
@@ -147,5 +148,6 @@ const streamInitial = {
         <StreamView client:load initial={streamInitial} />
       </div>
     </main>
+    <EmbeddingIndexer client:idle />
   </div>
 </Layout>

@@ -3,6 +3,7 @@ import Layout from "@/layouts/Layout.astro";
 import Masthead from "@/components/Masthead.astro";
 import NoteDetail from "@/components/islands/NoteDetail.vue";
 import { getIdeaById, countIdeas, listTagsWithCounts } from "@/lib/ideas";
+import { relatedCards } from "@/lib/embeddings";
 import { issueNumber } from "@/lib/issueNumber";
 import { LOCALE } from "@/lib/time";
 
@@ -36,6 +37,15 @@ const dated = new Date(idea.createdAt).toLocaleDateString(LOCALE, {
   year: "numeric",
 });
 const preview = idea.body.replace(/\s+/g, " ").trim().slice(0, 80);
+
+// Related notes are pure server-side KNN over the stored vectors — no browser
+// model needed. Empty (renders nothing) until this note has been embedded by
+// the on-device indexer, so a never-indexed note degrades gracefully.
+const related = relatedCards(user.id, idea.id, 5);
+const relatedItems = related.map((r) => ({
+  id: r.id,
+  preview: r.body.replace(/\s+/g, " ").trim().slice(0, 120) || "(empty note)",
+}));
 ---
 
 <Layout title={`DriftNote · ${preview || "Note"}`}>
@@ -63,6 +73,23 @@ const preview = idea.body.replace(/\s+/g, " ").trim().slice(0, 80);
         </section>
 
         <NoteDetail client:load idea={idea} />
+
+        {
+          relatedItems.length > 0 && (
+            <section class="related" data-testid="related-notes">
+              <h2 class="related-title">Related</h2>
+              <ul class="related-list">
+                {relatedItems.map((r) => (
+                  <li>
+                    <a class="related-link" href={`/i/${r.id}`}>
+                      {r.preview}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )
+        }
       </div>
     </main>
   </div>
@@ -78,5 +105,32 @@ const preview = idea.body.replace(/\s+/g, " ").trim().slice(0, 80);
   }
   .note-detail {
     margin-top: 8px;
+  }
+  .related {
+    margin-top: 32px;
+  }
+  .related-title {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 12px;
+  }
+  .related-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .related-link {
+    display: block;
+    color: var(--ink-2);
+    line-height: 1.45;
+    transition: color 120ms ease;
+  }
+  .related-link:hover {
+    color: var(--ink);
   }
 </style>
