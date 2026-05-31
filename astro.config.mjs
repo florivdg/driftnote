@@ -39,7 +39,12 @@ export default defineConfig({
         "default-src 'self'",
         "img-src 'self' data:",
         "font-src https://fonts.gstatic.com",
-        "connect-src 'self'",
+        // On-device AI (src/lib/ml/*): model weights download from the HF hub and
+        // the ONNX Runtime WASM from jsdelivr (both cached after first load).
+        // worker-src/blob: cover the Transformers.js model worker.
+        // TODO(#24/#25 follow-up): self-host the ORT wasm to drop the jsdelivr origin.
+        "connect-src 'self' https://huggingface.co https://*.hf.co https://cdn-lfs.huggingface.co https://cdn-lfs-us-1.hf.co https://cdn.jsdelivr.net",
+        "worker-src 'self' blob:",
         "frame-ancestors 'none'",
         "base-uri 'self'",
         "form-action 'self'",
@@ -48,6 +53,11 @@ export default defineConfig({
         resources: ["'self'", "https://fonts.googleapis.com"],
       },
       scriptDirective: {
+        // Setting `resources` REPLACES Astro's default `script-src 'self'`
+        // (see astro/dist/runtime/server/render/csp.js), so 'self' must be
+        // re-listed or every bundled island chunk gets blocked.
+        // 'wasm-unsafe-eval' lets ONNX Runtime Web compile its WASM backend.
+        resources: ["'self'", "'wasm-unsafe-eval'"],
         // sha256 of the FOUC-killer in src/layouts/Layout.astro.
         // Recompute via `bun scripts/csp-fouc-hash.ts` whenever that script changes.
         hashes: ["sha256-or8ltn6lsi8gooSd/lFUJno4iOeNl7gkWvdmpY2sX+M="],

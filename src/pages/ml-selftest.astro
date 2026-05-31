@@ -1,0 +1,34 @@
+---
+// Unlinked diagnostic page for the on-device model runtime. Authed like every
+// other route. A future home for a "does on-device AI work on this device?"
+// settings check; for now it's the verification surface for the runtime.
+import Layout from "@/layouts/Layout.astro";
+import MlSelfTest from "@/components/islands/MlSelfTest.vue";
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+if (!user) {
+  return Astro.redirect(
+    `/login?next=${encodeURIComponent(Astro.url.pathname)}`,
+  );
+}
+---
+
+<Layout title="On-device model self-test">
+  <main class="ml-selftest-page">
+    <h1>On-device model runtime</h1>
+    <p>
+      Downloads a small embedding model and runs one inference in your browser.
+    </p>
+    <MlSelfTest client:load />
+  </main>
+</Layout>
+
+<style>
+  .ml-selftest-page {
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+</style>
