@@ -87,6 +87,14 @@ The masthead's "N ENTRIES / N TAGS" counters and the issue header's "N unfinishe
 
 **`bun x auth@latest`** must be invoked with `bunx --bun` to run under the Bun runtime — same `bun:sqlite` constraint as `astro dev`.
 
+## On-device AI & MCP
+
+**AI runs in the browser, not the server.** Embeddings and Whisper transcription live in `src/lib/ml/*` (shared worker runtime), `src/lib/embed-model.ts`, and `src/lib/voice*.ts` — `@huggingface/transformers` in a Web Worker, WebGPU with WASM fallback, weights from the HF hub. Any change to the worker or the model origins must keep `astro.config.mjs` CSP `connect-src` / `worker-src` in sync. CSP is **build-only** — verify with `bun run build && bun run start`, never `astro dev`.
+
+Embeddings are stored in the `idea_embedding` table (migration `0003`); the indexer (`src/components/islands/EmbeddingIndexer.vue`) drives `GET /api/embeddings/pending`, `PUT /api/ideas/[id]/embedding`, and `GET /api/ideas/[id]/related` (brute-force KNN over fresh vectors; stale vectors are excluded — see `src/lib/embeddings.ts`).
+
+**MCP server** is in `src/lib/mcp/server.ts`, routed via `src/pages/api/mcp/[...path].ts`; OAuth config (open DCR, PKCE, consent page, `resource`) is in `src/lib/auth.ts`. The four tools are rate-limited and user-scoped — preserve the `gate(...)` wrapper. Operator/deployment detail for all of the above lives in `docs/CONFIGURATION.md`.
+
 ## Linting and codebase health
 
 `bun run lint` runs oxlint with **type-aware** rules enabled (`options.typeAware: true` in `.oxlintrc.json`, backed by the `oxlint-tsgolint` dep). It catches real bugs that surface-level lint misses, e.g. `await` on synchronous Drizzle `.get()` calls. Keep it green.

@@ -55,6 +55,17 @@ The client-side `authClient` derives its base URL from `window.location.origin` 
 
 `HOST` and `PORT` are set in the image (`0.0.0.0:3000`) and rarely need overriding. The nonroot user cannot bind below 1024. If you do override `PORT`, the in-image `HEALTHCHECK` honors it automatically.
 
+See [`CONFIGURATION.md`](./CONFIGURATION.md) for the full environment reference plus the reverse-proxy, CSP, on-device AI, and MCP/OAuth requirements.
+
+## Reverse proxy & TLS
+
+DriftNote expects to run behind a TLS-terminating reverse proxy. Two things must hold, or the app misbehaves in ways the container itself can't catch:
+
+- **Forwarded headers.** The proxy must overwrite/strip client-supplied `X-Forwarded-*`, and the container port must not be reachable bypassing the proxy. The app rebuilds its request origin from those headers (`security.allowedDomains: [{}]`) for its CSRF check.
+- **TLS for voice + a passthrough CSP.** Voice capture needs a secure context (HTTPS); `localhost` is exempt but a real host is not. The build-time CSP also allows specific Hugging Face / jsDelivr origins for on-device model downloads — a proxy or WAF that strips or rewrites the CSP header breaks the AI features.
+
+The full forwarded-header contract and the exact CSP directive list live in [`CONFIGURATION.md`](./CONFIGURATION.md).
+
 ## Migrations
 
 `scripts/serve.ts` runs `drizzle-orm/bun-sqlite/migrator` against `./drizzle/` on every container start, then hands off to `./dist/server/entry.mjs`. Pending migrations apply automatically — no separate step in the normal flow.
