@@ -933,6 +933,39 @@ body[data-theme="dark"] .theme-toggle .knob {
   }
 }
 
+/* Transcription language selector */
+.voice-lang {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.voice-lang select {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  background: transparent;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.voice-lang select:hover {
+  color: var(--ink);
+  border-color: var(--ink-3);
+}
+
+/* Transcription error */
+.voice-error {
+  margin: 0;
+  padding: 6px 22px 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--hot);
+}
+
 /* Voice panel */
 .voice-panel {
   display: flex;
