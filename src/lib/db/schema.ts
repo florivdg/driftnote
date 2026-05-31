@@ -3,6 +3,7 @@ import {
   sqliteTable,
   text,
   integer,
+  blob,
   index,
   uniqueIndex,
   primaryKey,
@@ -65,3 +66,20 @@ export const ideaTags = sqliteTable(
     index("idx_idea_tags_tag").on(t.tagId),
   ],
 );
+
+// One on-device embedding per note. `vector` is the raw little-endian Float32
+// bytes of an L2-normalized sentence vector, so cosine similarity reduces to a
+// dot product. `model` + `dim` pin the index contract: KNN only compares
+// same-model vectors, and a model change triggers a full reindex. `contentHash`
+// of the embedded body is the staleness signal — any body change (including the
+// server-side tag-rename/delete body rewrites) invalidates the row.
+export const ideaEmbedding = sqliteTable("idea_embedding", {
+  ideaId: text("idea_id")
+    .primaryKey()
+    .references(() => ideas.id, { onDelete: "cascade" }),
+  model: text("model").notNull(),
+  dim: integer("dim").notNull(),
+  vector: blob("vector", { mode: "buffer" }).notNull(),
+  contentHash: text("content_hash").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
